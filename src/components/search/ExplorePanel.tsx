@@ -24,7 +24,7 @@ import { BRAND } from '../../config/brand';
 import { formatDurationPtBR } from '../../engine/geo';
 import { searchPlaces } from '../../engine/routing';
 import { computeRouteTelemetry } from '../../engine/telemetry';
-import { selectActiveVehicle, useAppStore } from '../../store/useAppStore';
+import { selectActiveCapital, selectActiveVehicle, useAppStore } from '../../store/useAppStore';
 import type {
   CommunityRoute,
   PlaceResult,
@@ -68,6 +68,8 @@ export function ExplorePanel() {
 
   const exploreTab = useAppStore((s) => s.exploreTab);
   const setExploreTab = useAppStore((s) => s.setExploreTab);
+  const setCityModalOpen = useAppStore((s) => s.setCityModalOpen);
+  const activeCapital = useAppStore(selectActiveCapital);
   const savedRoutes = useAppStore((s) => s.savedRoutes);
   const communityRoutes = useAppStore((s) => s.communityRoutes);
   const routeRatings = useAppStore((s) => s.routeRatings);
@@ -100,21 +102,29 @@ export function ExplorePanel() {
   useEffect(() => {
     const timer = setTimeout(async () => {
       setSearching(true);
-      const list = await searchPlaces(query, navPos ?? BRAND.defaultCenter);
+      const list = await searchPlaces(
+        query,
+        navPos ?? activeCapital.center ?? BRAND.defaultCenter,
+        activeCapital.slug
+      );
       setResults(list);
       setSearching(false);
     }, query ? 260 : 0);
     return () => clearTimeout(timer);
-  }, [query, navPos]);
+  }, [query, navPos, activeCapital]);
 
   useEffect(() => {
     if (!addingPlaceFor) return;
     const timer = setTimeout(async () => {
-      const list = await searchPlaces(addPlaceQuery, navPos ?? BRAND.defaultCenter);
+      const list = await searchPlaces(
+        addPlaceQuery,
+        navPos ?? activeCapital.center ?? BRAND.defaultCenter,
+        activeCapital.slug
+      );
       setAddPlaceResults(list);
     }, addPlaceQuery ? 240 : 0);
     return () => clearTimeout(timer);
-  }, [addingPlaceFor, addPlaceQuery, navPos]);
+  }, [addingPlaceFor, addPlaceQuery, navPos, activeCapital]);
 
   const handleSelectPlace = (place: PlaceResult) => {
     setQuery('');
@@ -756,11 +766,22 @@ export function ExplorePanel() {
             )}
           </div>
 
-          {/* Rotas em Brasília (Bottom) */}
+          {/* Rotas na Capital Ativa (Bottom) + Seletor 27 Capitais */}
           <div className="space-y-2">
-            <h2 className="px-0.5 text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-              Rotas em Brasília
-            </h2>
+            <div className="flex items-center justify-between gap-2 px-0.5">
+              <h2 className="truncate text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                Rotas em {activeCapital.name}
+              </h2>
+              <button
+                id="eixoverde-city-selector-btn"
+                type="button"
+                onClick={() => setCityModalOpen(true)}
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-700 transition-colors hover:bg-emerald-500/20 dark:text-emerald-300"
+              >
+                <Globe className="h-3 w-3" />
+                {activeCapital.label} • 27 Capitais
+              </button>
+            </div>
             <div className="space-y-2">{brasiliaRoutes.map((r) => renderRouteCard(r))}</div>
           </div>
         </div>

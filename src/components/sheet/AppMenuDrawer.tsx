@@ -8,6 +8,7 @@ import {
   Cloud,
   CloudOff,
   Download,
+  Globe2,
   HardDrive,
   Layers,
   Loader2,
@@ -28,7 +29,7 @@ import {
 import { BRAND } from '../../config/brand';
 import { hasMapTilerKey, hasOrsKey, hasSupabaseConfig } from '../../config/providers';
 import { isOrsProxyCircuitOpen } from '../../engine/routing';
-import { selectActiveVehicle, useAppStore } from '../../store/useAppStore';
+import { selectActiveCapital, selectActiveVehicle, useAppStore } from '../../store/useAppStore';
 
 export function AppMenuDrawer() {
   const open = useAppStore((s) => s.menuOpen);
@@ -37,6 +38,7 @@ export function AppMenuDrawer() {
   const setCompareOpen = useAppStore((s) => s.setCompareOpen);
   const setAuthModalOpen = useAppStore((s) => s.setAuthModalOpen);
   const setPrivacyModalOpen = useAppStore((s) => s.setPrivacyModalOpen);
+  const setCityModalOpen = useAppStore((s) => s.setCityModalOpen);
   const setExploreTab = useAppStore((s) => s.setExploreTab);
   const clearActiveRoute = useAppStore((s) => s.clearActiveRoute);
   const theme = useAppStore((s) => s.theme);
@@ -49,6 +51,7 @@ export function AppMenuDrawer() {
   const showHazards = useAppStore((s) => s.showHazards);
   const toggleLayer = useAppStore((s) => s.toggleLayer);
   const activeVehicle = useAppStore(selectActiveVehicle);
+  const activeCapital = useAppStore(selectActiveCapital);
   const savedRoutes = useAppStore((s) => s.savedRoutes);
   const savedPlaces = useAppStore((s) => s.savedPlaces);
   const rideSessions = useAppStore((s) => s.rideSessions);
@@ -355,6 +358,24 @@ export function AppMenuDrawer() {
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-bold text-slate-900 dark:text-white">Minha Garagem</div>
                 <div className="truncate text-xs text-slate-500 dark:text-slate-400">{activeVehicle.name}</div>
+              </div>
+            </button>
+
+            <button
+              id="eixoverde-menu-city-btn"
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                setCityModalOpen(true);
+              }}
+              className="flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              <Globe2 className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-semibold">Explorar Brasil • 27 Capitais</div>
+                <div className="truncate text-[11px] text-slate-400">
+                  {activeCapital.label} • {activeCapital.totalKm.toString().replace('.', ',')} km de ciclovias
+                </div>
               </div>
             </button>
 

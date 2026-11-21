@@ -137,28 +137,42 @@ export const JET_DF_HUBS: MobilityStation[] = [
 ];
 
 /**
- * Extracts real Bike Brasília / Tembici stations from CicloMapa DF POI GeoJSON
- * and merges them with the curated JET scooter hubs into a unified GeoJSON FeatureCollection.
+ * Extracts real shared bike stations from any of the 27 Brazilian capitals' CicloMapa POI GeoJSON
+ * and merges them with curated scooter hubs when in Brasília/DF.
  */
 export function buildMobilityStationsCollection(
-  poisGeoJson?: GeoJSON.FeatureCollection | null
+  poisGeoJson?: GeoJSON.FeatureCollection | null,
+  citySlug = 'brasilia',
+  bikeShareBrand = 'Bike Brasília (Tembici)'
 ): { stations: MobilityStation[]; geojson: GeoJSON.FeatureCollection } {
   const tembiciStations: MobilityStation[] = [];
+  const isDf = !citySlug || citySlug === 'brasilia';
 
   if (poisGeoJson?.features) {
     let idx = 1;
     for (const feat of poisGeoJson.features) {
-      const props = (feat.properties ?? {}) as { kind?: string; name?: string; label?: string };
+      const props = (feat.properties ?? {}) as {
+        kind?: string;
+        name?: string;
+        label?: string;
+        operator?: string;
+        network?: string;
+      };
       if (props.kind !== 'estacao' || feat.geometry?.type !== 'Point') continue;
       const coords = feat.geometry.coordinates as LngLat;
       if (!Array.isArray(coords) || coords.length < 2) continue;
       const rawName = (props.name || '').trim();
-      const name = rawName ? `Tembici • ${rawName}` : `Estação Bike Brasília #${idx}`;
+      const brandLabel = isDf ? 'Tembici' : props.network || props.operator || bikeShareBrand.split(' ')[0] || 'Bike';
+      const name = rawName
+        ? `${brandLabel} • ${rawName}`
+        : isDf
+          ? `Estação Bike Brasília #${idx}`
+          : `Estação ${bikeShareBrand} #${idx}`;
       tembiciStations.push({
-        id: `tembici-df-${idx}`,
+        id: `tembici-${citySlug}-${idx}`,
         provider: 'tembici',
         name,
-        subtitle: 'Estação Bike Brasília (Tembici)',
+        subtitle: isDf ? 'Estação Bike Brasília (Tembici)' : `Estação ${bikeShareBrand}`,
         coords: [+coords[0].toFixed(6), +coords[1].toFixed(6)],
         capacityHint: 'Bicicletas compartilhadas',
       });
@@ -166,7 +180,7 @@ export function buildMobilityStationsCollection(
     }
   }
 
-  const stations = [...tembiciStations, ...JET_DF_HUBS];
+  const stations = isDf ? [...tembiciStations, ...JET_DF_HUBS] : tembiciStations;
   const geojson: GeoJSON.FeatureCollection = {
     type: 'FeatureCollection',
     features: stations.map((s) => ({

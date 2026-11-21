@@ -8,7 +8,8 @@ import {
   hasOrsKey,
   hasSupabaseConfig,
 } from '../config/providers';
-import { POPULAR_DF_PLACES } from '../data/curatedRoutes';
+import { getCapitalBySlug } from '../data/brazilCities';
+import { ALL_POPULAR_PLACES, getPopularPlacesForCity } from '../data/curatedRoutes';
 import type {
   Coord3D,
   LngLat,
@@ -447,22 +448,34 @@ export async function planMultiProfileRoutes(
 }
 
 /**
- * Autocomplete geocoding across all of Brazil (biased toward user viewport / Brasília DF)
- * combining curated DF places + Komoot Photon API.
+ * Autocomplete geocoding across all 27 Brazilian State Capitals (biased toward active capital / user viewport)
+ * combining curated city landmarks + Komoot Photon API + Nominatim Brazil fallback.
  */
-export async function searchPlaces(query: string, biasCenter?: LngLat): Promise<PlaceResult[]> {
+export async function searchPlaces(
+  query: string,
+  biasCenter?: LngLat,
+  citySlug?: string
+): Promise<PlaceResult[]> {
   const q = query.trim();
   const qLower = q.toLowerCase();
+  const activeCap = getCapitalBySlug(citySlug);
+  const cityPlaces = getPopularPlacesForCity(activeCap.slug);
 
-  const curatedMatches = POPULAR_DF_PLACES.filter(
+  const curatedMatches = (q ? ALL_POPULAR_PLACES : cityPlaces).filter(
     (p) => !q || p.name.toLowerCase().includes(qLower) || p.subtitle.toLowerCase().includes(qLower)
   );
+  // Sort matches from active capital first
+  curatedMatches.sort((a, b) => {
+    const aActive = a.city === activeCap.name && a.state === activeCap.stateCode ? 0 : 1;
+    const bActive = b.city === activeCap.name && b.state === activeCap.stateCode ? 0 : 1;
+    return aActive - bActive;
+  });
 
   if (q.length < 2) {
     return curatedMatches.slice(0, 6);
   }
 
-  const center = biasCenter ?? BRAND.defaultCenter;
+  const center = biasCenter ?? activeCap.center ?? BRAND.defaultCenter;
   try {
     const url = `${ENDPOINTS.photonSearch}?q=${encodeURIComponent(q)}&lat=${center[1].toFixed(4)}&lon=${center[0].toFixed(4)}&limit=7`;
     const res = await fetchWithTimeout(url, { method: 'GET' }, 4500);
@@ -502,9 +515,10 @@ export async function searchPlaces(query: string, biasCenter?: LngLat): Promise<
     // Fall through to Nominatim Brazil fallback
   }
 
-  // Fallback to Nominatim (Brazil scoped) if Photon failed or returned zero results
+  // Fallback to Nominatim (Brazil scoped + active capital viewbox bias)
   try {
-    const nomUrl = `${ENDPOINTS.nominatimSearch}?q=${encodeURIComponent(q)}&countrycodes=br&format=json&addressdetails=1&limit=6`;
+    const vb = activeCap.viewbox.join(',');
+    const nomUrl = `${ENDPOINTS.nominatimSearch}?q=${encodeURIComponent(q)}&countrycodes=br&viewbox=${vb}&format=json&addressdetails=1&limit=6`;
     const res = await fetchWithTimeout(nomUrl, { method: 'GET' }, 4500);
     if (res.ok) {
       const rows = (await res.json()) as Array<{
@@ -608,13 +622,12 @@ export async function reverseGeocode(coords: LngLat): Promise<PlaceResult> {
       };
     }
   } catch {
-    // Fallback to nearest curated DF landmark or coordinates
+    // Fallback to nearest curated landmark across all 27 Brazilian capitals or coordinates
   }
 
-  // Graceful local fallback inside Brasília DF when offline or geocoder rate-limited
   let nearest: PlaceResult | null = null;
   let nearestDist = 3500;
-  for (const place of POPULAR_DF_PLACES) {
+  for (const place of ALL_POPULAR_PLACES) {
     const d = haversineMeters(coords, place.coords);
     if (d < nearestDist) {
       nearestDist = d;

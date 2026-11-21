@@ -1,4 +1,9 @@
 import type { Coord3D, PlaceResult, SavedRoute } from '../types';
+import {
+  NATIONAL_CURATED_PLACES,
+  NATIONAL_CURATED_ROUTES,
+  getCapitalBySlug,
+} from './brazilCities';
 
 /**
  * Exact GPX mapped route (Praça dos Três Poderes → SHCGN 711 Norte)
@@ -547,3 +552,28 @@ export const POPULAR_DF_PLACES: PlaceResult[] = [
     source: 'curated',
   },
 ];
+
+export const ALL_CURATED_ROUTES: SavedRoute[] = [
+  ...CURATED_DF_ROUTES,
+  ...NATIONAL_CURATED_ROUTES,
+];
+
+export const ALL_POPULAR_PLACES: PlaceResult[] = [
+  ...POPULAR_DF_PLACES,
+  ...NATIONAL_CURATED_PLACES,
+];
+
+export function getCuratedRoutesForCity(citySlug?: string | null): SavedRoute[] {
+  const cap = getCapitalBySlug(citySlug);
+  if (cap.slug === 'brasilia') return CURATED_DF_ROUTES;
+  return NATIONAL_CURATED_ROUTES.filter((r) => r.city === cap.label);
+}
+
+export function getPopularPlacesForCity(citySlug?: string | null): PlaceResult[] {
+  const cap = getCapitalBySlug(citySlug);
+  if (cap.slug === 'brasilia') return POPULAR_DF_PLACES;
+  return [
+    ...NATIONAL_CURATED_PLACES.filter((p) => p.city === cap.name && p.state === cap.stateCode),
+    ...POPULAR_DF_PLACES,
+  ];
+}

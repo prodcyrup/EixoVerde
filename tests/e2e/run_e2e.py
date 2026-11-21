@@ -517,6 +517,26 @@ def run_e2e() -> int:
             check("Offline routing gracefully falls back without crashing", "Offline" in off_text and "Três Poderes" not in off_text)
             page.unroute("**/*", block_routing)
 
+            # 1h. Phase 6: 27 Brazilian State Capitals Selector Modal & City Switching
+            page.locator("aside button[aria-label='Voltar']").click()
+            time.sleep(0.25)
+            page.click("#eixoverde-city-selector-btn")
+            page.wait_for_selector("#eixoverde-city-modal", timeout=6000)
+            cap_buttons_count = page.locator("#eixoverde-city-modal button[data-city-slug]").count()
+            check("Phase 6 CitySelectorModal renders all 27 Brazilian State Capitals across 5 Regions", cap_buttons_count == 27, f"count={cap_buttons_count}")
+            page.click("#eixoverde-city-modal button[data-city-slug='sao-paulo']")
+            time.sleep(0.4)
+            sp_panel_text = page.locator("aside").first.inner_text()
+            check(
+                "Phase 6 Selecting São Paulo switches curated routes & lazy-loads SP CicloMapa network",
+                "Ciclovia Av. Paulista" in sp_panel_text and "Ciclovia Rio Pinheiros" in sp_panel_text,
+            )
+            # Switch back to Brasília
+            page.click("#eixoverde-city-selector-btn")
+            page.wait_for_selector("#eixoverde-city-modal", timeout=6000)
+            page.click("#eixoverde-city-modal button[data-city-slug='brasilia']")
+            time.sleep(0.3)
+
             check("Zero Supabase requests emitted in zero-key Guest mode", len(supabase_requests_in_guest) == 0)
             check("Desktop Guest mode zero uncaught page errors", len(desktop_errors) == 0, "; ".join(desktop_errors))
             ctx.close()
