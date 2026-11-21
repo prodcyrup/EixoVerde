@@ -238,7 +238,8 @@ describe('supabaseClient.ts lazy singleton', () => {
     expect(c3).not.toBeNull();
     expect(c3).not.toBe(c1);
 
-    vi.unstubAllEnvs();
+    vi.stubEnv('VITE_SUPABASE_URL', '');
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', '');
     resetSupabaseClientForTests();
     expect(getSupabaseClient()).toBeNull();
   });
