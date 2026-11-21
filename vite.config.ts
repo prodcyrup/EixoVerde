@@ -8,9 +8,11 @@ const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 
   version: string;
 };
 
-export default defineConfig(({ command }) => {
-  // Deploy cleanly on GitHub Pages (/EixoVerde/) while keeping local dev at /
-  const base = process.env.VITE_BASE_PATH ?? (command === 'build' ? '/EixoVerde/' : '/');
+export default defineConfig(({ command, mode }) => {
+  // Deploy cleanly on GitHub Pages (/EixoVerde/), mobile Capacitor (./), and local dev (/)
+  const base =
+    process.env.VITE_BASE_PATH ??
+    (mode === 'mobile' ? './' : command === 'build' ? '/EixoVerde/' : '/');
 
   return {
     base,
