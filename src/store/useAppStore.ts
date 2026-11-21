@@ -357,7 +357,37 @@ function savedRouteToCandidate(route: SavedRoute): RouteCandidate {
   };
 }
 
+const THEME_STORAGE_KEY = 'eixoverde:theme';
+
+function getInitialTheme(): ThemeMode {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem(THEME_STORAGE_KEY);
+      if (saved === 'dark' || saved === 'light') {
+        if (typeof document !== 'undefined') {
+          document.documentElement.classList.toggle('dark', saved === 'dark');
+        }
+        return saved;
+      }
+    }
+  } catch {
+    // Fallback to light
+  }
+  return 'light';
+}
+
+function syncPersistTheme(theme: ThemeMode): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    }
+  } catch {
+    // Ignore storage quota / privacy mode errors
+  }
+}
+
 function persistPrefs(state: AppStore): void {
+  syncPersistTheme(state.theme);
   const prefs: UserPreferences = {
     theme: state.theme,
     basemap: state.basemap,
@@ -380,7 +410,7 @@ function persistPrefs(state: AppStore): void {
 export const useAppStore = create<AppStore>((set, get) => ({
   initialized: false,
   mode: 'explore',
-  theme: 'light',
+  theme: getInitialTheme(),
   basemap: 'standard',
   voiceMode: 'voice', // Audio-first handlebar mode ON by default
   showBikeLanes: true,
@@ -485,6 +515,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     ]);
 
     const theme: ThemeMode = prefs.theme ?? get().theme ?? 'light';
+    syncPersistTheme(theme);
     if (typeof document !== 'undefined') {
       document.documentElement.classList.toggle('dark', theme === 'dark');
     }
