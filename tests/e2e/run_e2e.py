@@ -703,6 +703,7 @@ def run_e2e() -> int:
 
             pushed_places = []
             ors_proxy_calls = []
+            delete_account_rpc_calls = []
 
             def handle_supabase_mock(route):
                 req = route.request
@@ -721,6 +722,11 @@ def run_e2e() -> int:
                     return
 
                 cors = {"Access-Control-Allow-Origin": "*", "Content-Type": "application/json"}
+
+                if "/rest/v1/rpc/delete_my_account" in url:
+                    delete_account_rpc_calls.append(True)
+                    route.fulfill(status=200, headers=cors, body="null")
+                    return
 
                 # Auth endpoints
                 if "/auth/v1/token" in url:
@@ -1017,13 +1023,23 @@ def run_e2e() -> int:
             v_badge = cpage.locator("#eixoverde-sync-status").inner_text()
             check("Cloud Guest menu displays 'Visitante' & 'Entrar ou Criar Conta' button", "Visitante" in v_badge)
 
-            # Open AuthModal & test Google OAuth button, dark-mode focused input contrast + invalid login PT-BR error
+            # Open AuthModal & test Google OAuth button, LGPD PrivacyPolicyModal link, dark-mode focused input contrast + invalid login PT-BR error
             cpage.click("#eixoverde-auth-open-btn")
             cpage.wait_for_selector("#eixoverde-auth-modal", timeout=6000)
             check(
                 "AuthModal renders 'Continuar com Google' OAuth button",
                 cpage.locator("#eixoverde-auth-google-btn").is_visible(),
             )
+            cpage.click("#eixoverde-auth-privacy-link")
+            cpage.wait_for_selector("#eixoverde-privacy-modal", timeout=6000)
+            priv_text = cpage.locator("#eixoverde-privacy-modal").inner_text()
+            check(
+                "Phase 5 LGPD PrivacyPolicyModal opens from AuthModal with GPS & account deletion disclosures",
+                "LGPD" in priv_text and "Exclusão Instantânea de Conta" in priv_text,
+            )
+            cpage.click("#eixoverde-privacy-accept-btn")
+            time.sleep(0.2)
+
             email_in = cpage.locator("#eixoverde-auth-email")
             pass_in = cpage.locator("#eixoverde-auth-password")
             email_in.click()
@@ -1121,6 +1137,31 @@ def run_e2e() -> int:
                 "Visitante" in cpage.locator("#eixoverde-sync-status").inner_text()
                 and "Rota Cloud Sincronizada" in cpage.locator("aside").first.inner_text(),
             )
+
+            # Phase 5: Re-authenticate & verify In-App Account Deletion (Apple 5.1.1(v) / Google Play Data Safety)
+            cpage.click("#eixoverde-auth-open-btn")
+            cpage.wait_for_selector("#eixoverde-auth-modal", timeout=6000)
+            cpage.fill("#eixoverde-auth-email", "vitor@eixoverde.com.br")
+            cpage.fill("#eixoverde-auth-password", "senhaForte123")
+            cpage.click("#eixoverde-auth-submit")
+            time.sleep(0.6)
+            if cpage.locator("#eixoverde-migration-skip-btn").is_visible():
+                cpage.click("#eixoverde-migration-skip-btn")
+                time.sleep(0.3)
+            cpage.click("#eixoverde-desktop-menu-btn")
+            cpage.wait_for_selector("#eixoverde-delete-account-open-btn", timeout=6000)
+            cpage.click("#eixoverde-delete-account-open-btn")
+            cpage.wait_for_selector("#eixoverde-delete-account-confirm-box", timeout=6000)
+            cpage.click("#eixoverde-delete-account-confirm-btn")
+            time.sleep(0.5)
+            cpage.click("#eixoverde-desktop-menu-btn")
+            cpage.wait_for_selector("#eixoverde-sync-status", timeout=6000)
+            check(
+                "Phase 5 In-App Account Deletion calls delete_my_account RPC & returns cleanly to Visitante",
+                len(delete_account_rpc_calls) == 1
+                and "Visitante" in cpage.locator("#eixoverde-sync-status").inner_text(),
+            )
+
             check("Cloud E2E pass zero uncaught page errors", len(cloud_errors) == 0, "; ".join(cloud_errors))
             cloud_ctx.close()
 

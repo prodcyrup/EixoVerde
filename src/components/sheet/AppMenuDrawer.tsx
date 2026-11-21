@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -15,9 +16,11 @@ import {
   Moon,
   RefreshCw,
   Satellite,
+  ShieldCheck,
   ShoppingBag,
   Star,
   Sun,
+  Trash2,
   UserCheck,
   X,
   Zap,
@@ -33,6 +36,7 @@ export function AppMenuDrawer() {
   const setGarageOpen = useAppStore((s) => s.setGarageOpen);
   const setCompareOpen = useAppStore((s) => s.setCompareOpen);
   const setAuthModalOpen = useAppStore((s) => s.setAuthModalOpen);
+  const setPrivacyModalOpen = useAppStore((s) => s.setPrivacyModalOpen);
   const setExploreTab = useAppStore((s) => s.setExploreTab);
   const clearActiveRoute = useAppStore((s) => s.clearActiveRoute);
   const theme = useAppStore((s) => s.theme);
@@ -57,11 +61,16 @@ export function AppMenuDrawer() {
   const syncError = useAppStore((s) => s.syncError);
   const syncNow = useAppStore((s) => s.syncNow);
   const signOut = useAppStore((s) => s.signOut);
+  const deleteAccount = useAppStore((s) => s.deleteAccount);
+  const deleteAccountLoading = useAppStore((s) => s.deleteAccountLoading);
 
   const offlineCache = useAppStore((s) => s.offlineCache);
   const offlineCacheLoading = useAppStore((s) => s.offlineCacheLoading);
   const warmOfflineCache = useAppStore((s) => s.warmOfflineCache);
   const realtimeConnected = useAppStore((s) => s.realtimeConnected);
+
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [wipeLocalOnDelete, setWipeLocalOnDelete] = useState(false);
 
   if (!open) return null;
 
@@ -260,6 +269,75 @@ export function AppMenuDrawer() {
                     Sair
                   </button>
                 </div>
+
+                {/* Phase 5: Store Compliance In-App Account Deletion (Apple 5.1.1(v) / Google Play Data Safety / LGPD) */}
+                {!confirmDeleteOpen ? (
+                  <button
+                    id="eixoverde-delete-account-open-btn"
+                    type="button"
+                    onClick={() => setConfirmDeleteOpen(true)}
+                    className="flex w-full items-center justify-center gap-1 pt-1 text-[11px] font-semibold text-slate-400 transition-colors hover:text-rose-600 dark:text-slate-500 dark:hover:text-rose-400"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    Excluir minha conta e dados na nuvem
+                  </button>
+                ) : (
+                  <div
+                    id="eixoverde-delete-account-confirm-box"
+                    className="mt-2 space-y-2 rounded-xl border border-rose-500/35 bg-rose-500/10 p-2.5 text-[11px]"
+                  >
+                    <div className="font-extrabold text-rose-700 dark:text-rose-300">
+                      Excluir conta permanentemente?
+                    </div>
+                    <p className="leading-snug text-rose-700/90 dark:text-rose-200/90">
+                      Seus dados sincronizados na nuvem (rotas, locais, garagem e avaliações) serão apagados imediatamente.
+                    </p>
+                    <label className="flex cursor-pointer items-center gap-2 font-medium text-slate-700 dark:text-slate-200">
+                      <input
+                        id="eixoverde-delete-wipe-local"
+                        type="checkbox"
+                        checked={wipeLocalOnDelete}
+                        onChange={(e) => setWipeLocalOnDelete(e.target.checked)}
+                        className="h-3.5 w-3.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500"
+                      />
+                      <span>Apagar também dados salvos neste aparelho</span>
+                    </label>
+                    <div className="flex items-center gap-1.5 pt-1">
+                      <button
+                        id="eixoverde-delete-account-cancel-btn"
+                        type="button"
+                        disabled={deleteAccountLoading}
+                        onClick={() => {
+                          setConfirmDeleteOpen(false);
+                          setWipeLocalOnDelete(false);
+                        }}
+                        className="flex-1 rounded-lg border border-slate-200 bg-white py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        id="eixoverde-delete-account-confirm-btn"
+                        type="button"
+                        disabled={deleteAccountLoading}
+                        onClick={async () => {
+                          const res = await deleteAccount(wipeLocalOnDelete);
+                          if (res.ok) {
+                            setConfirmDeleteOpen(false);
+                            setWipeLocalOnDelete(false);
+                          }
+                        }}
+                        className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-rose-600 py-1.5 text-[11px] font-extrabold text-white shadow-xs hover:bg-rose-500 disabled:opacity-60"
+                      >
+                        {deleteAccountLoading ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-3 w-3" />
+                        )}
+                        Confirmar Exclusão
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -340,6 +418,22 @@ export function AppMenuDrawer() {
               <div className="flex-1">
                 <div className="text-sm font-semibold">Comparar &amp; Comprar</div>
                 <div className="text-[11px] text-slate-400">Patinetes, E-Bikes &amp; custo-benefício</div>
+              </div>
+            </button>
+
+            <button
+              id="eixoverde-privacy-open-btn"
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                setPrivacyModalOpen(true);
+              }}
+              className="flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+              <ShieldCheck className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />
+              <div className="flex-1">
+                <div className="text-sm font-semibold">Privacidade &amp; Termos (LGPD)</div>
+                <div className="text-[11px] text-slate-400">Transparência de dados &amp; segurança</div>
               </div>
             </button>
           </div>

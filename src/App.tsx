@@ -35,6 +35,9 @@ const AppMenuDrawer = lazy(() =>
 const RideSummaryModal = lazy(() =>
   import('./components/rides/RideSummaryModal').then((m) => ({ default: m.RideSummaryModal }))
 );
+const PrivacyPolicyModal = lazy(() =>
+  import('./components/legal/PrivacyPolicyModal').then((m) => ({ default: m.PrivacyPolicyModal }))
+);
 
 export function App() {
   const bootstrap = useAppStore((s) => s.bootstrap);
@@ -46,6 +49,7 @@ export function App() {
   const pendingSavePlace = useAppStore((s) => s.pendingSavePlace);
   const mapContextPin = useAppStore((s) => s.mapContextPin);
   const authModalOpen = useAppStore((s) => s.authModalOpen);
+  const privacyModalOpen = useAppStore((s) => s.privacyModalOpen);
   const migrationPromptOpen = useAppStore((s) => s.migrationPromptOpen);
   const pendingRideSummary = useAppStore((s) => s.pendingRideSummary);
 
@@ -76,6 +80,7 @@ export function App() {
         {hazardPickerOpen && <HazardReportModal />}
         {pendingSavePlace && <SavePlaceModal />}
         {authModalOpen && <AuthModal />}
+        {privacyModalOpen && <PrivacyPolicyModal />}
         {migrationPromptOpen && <MigrationPromptModal />}
         {pendingRideSummary && <RideSummaryModal />}
       </Suspense>

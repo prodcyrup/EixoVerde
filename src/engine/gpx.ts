@@ -151,15 +151,25 @@ export function encodeShareableRouteUrl(name: string, waypoints: LngLat[], profi
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '');
-  const url = new URL(window.location.href);
+  const href =
+    typeof window !== 'undefined' &&
+    window.location?.href &&
+    !window.location.href.startsWith('capacitor://') &&
+    !window.location.href.startsWith('https://localhost')
+      ? window.location.href
+      : 'https://prodcyrup.github.io/EixoVerde/';
+  const url = new URL(href);
   url.searchParams.set('share', encoded);
   return url.toString();
 }
 
-export function decodeShareableRouteFromUrl(): { name: string; profile: string; waypoints: LngLat[] } | null {
+export function decodeShareableRouteFromUrl(
+  customShareParam?: string
+): { name: string; profile: string; waypoints: LngLat[] } | null {
   try {
-    const params = new URLSearchParams(window.location.search);
-    const raw = params.get('share');
+    const raw =
+      customShareParam ??
+      (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('share') : null);
     if (!raw) return null;
     const b64 = raw.replace(/-/g, '+').replace(/_/g, '/');
     const json = JSON.parse(decodeURIComponent(escape(atob(b64))));

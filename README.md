@@ -2,7 +2,7 @@
 
 Aplicativo web progressivo (PWA) de navegação inteligente, planejamento seguro em ciclovias e telemetria personalizada para **patinetes elétricos, e-bikes, bicicletas e micromobilidade**.
 
-## Principais Recursos (Fases 1–4 • Offline-First & Brasília Pro)
+## Principais Recursos (Fases 1–5 • Web PWA, Google Play Store & Apple App Store)
 - **Mapa Vetorial Único (MapLibre GL JS) + Callout Ancorado ao Pino:** explore, planeje, ajuste waypoints e navegue em 3D sobre o mesmo mapa em tema **Claro**, **Escuro** ou **Satélite**; clique com o botão direito (desktop) ou segure o dedo (mobile) para centralizar o mapa e abrir o balão de ações rápidas (*Salvar* / *Rotas*) ancorado diretamente acima do pino marcado.
 - **Malha Cicloviária DF + Trechos Coloridos por Segurança + Estações Tembici & JET:** malha otimizada do CicloMapa DF (-81%), visualização de cada trecho da rota por nível de segurança (*Ciclovia*, *Ciclofaixa*, *Via Calma*, *Via Comum*), camada dedicada com **38 estações reais Bike Brasília (Tembici)** e **16 hubs de patinetes JET** (com rota em 1 toque), além de **Cache Offline DF** em 1 clique.
 - **Roteamento Seguro Multi-Perfil + Clima & Vento (Open-Meteo Live):** compare até 3 trajetos (*Mais Segura • Ciclovias*, *Equilibrada*, *Mais Rápida*) com índice de segurança, altimetria interativa, alertas de travessia arterial, temperatura, chance de chuva, física de vento contra/a favor no ETA e na bateria, e avisos de pista molhada para aros pequenos.
@@ -11,7 +11,7 @@ Aplicativo web progressivo (PWA) de navegação inteligente, planejamento seguro
 - **Navegação Handlebar + Gravação GPS & Pedal Livre:** rotação 3D com bússola, voz PT-BR e sinais sonoros, Wake Lock, gravação automática com auto-pausa inteligente em semáforos (`< 2 km/h`), **Pedal Livre** sem rota prévia, modo demonstração e botão **Reportar Perigo** colaborativo com **Supabase Realtime**.
 - **Meus Pedais (Histórico, Replay no Mapa & GPX):** estatísticas acumuladas (distância, CO₂ evitado, calorias), replay interativo no mapa com gráfico de velocidade e altitude, promoção para *Rotas Salvas* e exportação GPX 1.1.
 - **Contas na Nuvem & Sincronização Offline-First (Opcional — Supabase + PostGIS + Google OAuth):** funciona 100% localmente via IndexedDB no modo Visitante (zero chaves) e ativa automaticamente contas na nuvem (E-mail/Senha, Link Mágico e Google), sincronização multi-dispositivo, alertas comunitários Realtime com PostGIS e proxy seguro do OpenRouteService (`ors-proxy`).
-- **Rotas Salvas, GPX/KML & Links Compartilháveis:** importação/exportação GPX/KML, links compartilháveis e persistência local com migração segura para a nuvem.
+- **Empacotamento Nativo Android & iOS (`br.com.eixoverde.app`) + Conformidade LGPD / Lojas:** projetos nativos Capacitor configurados (`android/` e `ios/`), pilha inteligente do botão voltar físico do Android, deep-link nativo `br.com.eixoverde.app://auth-callback`, exclusão instantânea de conta in-app (`delete_my_account`), Política de Privacidade & Termos LGPD integrados e workflow GitHub Actions gerando `.apk` e `.aab` prontos para instalação/publicação (veja **[`docs/MOBILE_STORES_SETUP.md`](docs/MOBILE_STORES_SETUP.md)**).
 
 ## Desenvolvimento Local & Verificação
 
@@ -20,20 +20,23 @@ npm install
 npm run dev
 ```
 
-Scripts de qualidade e build:
+Scripts de qualidade, build web e empacotamento mobile:
 
 ```bash
 npm run typecheck   # Verificação TypeScript estrita (tsc --noEmit)
 npm test            # Testes unitários e de integração (Vitest)
 npm run test:e2e    # Suite E2E multi-viewport (Playwright)
-npm run build       # Build de produção (tsc -b && vite build)
+npm run build       # Build de produção Web / GitHub Pages (tsc -b && vite build)
+npm run cap:sync    # Build mobile (VITE_BASE_PATH=./) + sincronização Android & iOS
+npm run cap:android # Abre o projeto nativo no Android Studio
+npm run cap:ios     # Abre o projeto nativo no Xcode (macOS)
 ```
 
 ## Chaves de API & Nuvem Supabase (Opcional)
 
 O app funciona **imediatamente sem nenhuma chave** no modo Visitante/Local usando fallback gratuito (**OpenFreeMap** + **BRouter / OSRM** + **IndexedDB**).
 
-Para ativar **Contas na Nuvem, Sincronização Offline-First, PostGIS e Proxy seguro `ors-proxy`**, siga o passo a passo completo em **[`docs/SUPABASE_SETUP.md`](docs/SUPABASE_SETUP.md)**.
+Para ativar **Contas na Nuvem, Sincronização Offline-First, PostGIS e Proxy seguro `ors-proxy`**, siga o passo a passo completo em **[`docs/SUPABASE_SETUP.md`](docs/SUPABASE_SETUP.md)**. Para publicar ou gerar pacotes Android (`.apk` / `.aab`) e iOS (`.ipa`), consulte **[`docs/MOBILE_STORES_SETUP.md`](docs/MOBILE_STORES_SETUP.md)**.
 
 Variáveis opcionais para `.env.local` (desenvolvimento) ou **Settings → Secrets and variables → Actions → Repository secrets** no GitHub:
 
@@ -42,7 +45,7 @@ Variáveis opcionais para `.env.local` (desenvolvimento) ou **Settings → Secre
 - `VITE_MAPTILER_KEY` — https://cloud.maptiler.com/ (estilos MapTiler Cloud; em *Allowed HTTP Origins*, use `prodcyrup.github.io` e `localhost`, um por linha)
 - `VITE_ORS_KEY` — https://account.heigit.org/ (opcional quando a Edge Function `ors-proxy` mantém `ORS_API_KEY` apenas no servidor)
 
-## Deploy Automático no GitHub Pages
+## Deploy Automático no GitHub Pages & Build Mobile Android
 
-O workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) detecta automaticamente o nome do repositório (`/${{ github.event.repository.name }}/`) e publica no GitHub Pages a cada push na branch `main`.
-No repositório do GitHub, basta selecionar **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+- O workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) publica automaticamente no GitHub Pages a cada push na branch `main`.
+- O workflow [`.github/workflows/mobile-build.yml`](.github/workflows/mobile-build.yml) compila automaticamente os pacotes Android (`EixoVerde-Android-Debug-APK` e `EixoVerde-Android-Release-AAB`) na aba **Actions** do GitHub.

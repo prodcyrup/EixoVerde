@@ -1,4 +1,9 @@
 import type { User } from '@supabase/supabase-js';
+import {
+  isNativeMobileApp,
+  NATIVE_AUTH_CALLBACK_URL,
+  type ParsedDeepLink,
+} from '../mobile/nativeBridge';
 import type { AuthUser } from '../types';
 import { getSupabaseClient } from './supabaseClient';
 
@@ -25,6 +30,9 @@ export function toAuthUser(user: User | null | undefined): AuthUser | null {
 }
 
 export function getAuthRedirectUrl(): string | undefined {
+  if (isNativeMobileApp()) {
+    return NATIVE_AUTH_CALLBACK_URL;
+  }
   if (typeof window === 'undefined' || !window.location) return undefined;
   const base = (import.meta.env?.BASE_URL ?? '/').replace(/\/?$/, '/');
   return `${window.location.origin}${base}`;
@@ -286,6 +294,80 @@ export async function signOut(): Promise<{ error?: string }> {
   } catch {
     // Even if network fails, local sign-out succeeds without losing local IndexedDB data
     return {};
+  }
+}
+
+/**
+ * Exchanges OAuth PKCE `?code=` or implicit `#access_token` returned via
+ * custom scheme (`br.com.eixoverde.app://auth-callback`) on Android & iOS.
+ */
+export async function consumeDeepLinkAuth(
+  parsed: ParsedDeepLink
+): Promise<{ user?: AuthUser; isRecovery?: boolean; error?: string }> {
+  const client = getSupabaseClient();
+  if (!client) return {};
+
+  try {
+    if (parsed.accessToken && parsed.refreshToken) {
+      const { data, error } = await client.auth.setSession({
+        access_token: parsed.accessToken,
+        refresh_token: parsed.refreshToken,
+      });
+      if (error) return { error: mapAuthErrorPtBr(error) };
+      return {
+        user: toAuthUser(data?.user ?? data?.session?.user) ?? undefined,
+        isRecovery: parsed.authType === 'recovery',
+      };
+    }
+
+    if (parsed.authCode && typeof client.auth.exchangeCodeForSession === 'function') {
+      const { data, error } = await client.auth.exchangeCodeForSession(parsed.authCode);
+      if (error) return { error: mapAuthErrorPtBr(error) };
+      return {
+        user: toAuthUser(data?.user ?? data?.session?.user) ?? undefined,
+        isRecovery: parsed.authType === 'recovery',
+      };
+    }
+  } catch (err) {
+    return { error: mapAuthErrorPtBr(err) };
+  }
+
+  return {};
+}
+
+/**
+ * Permanently deletes the signed-in user's cloud account and all cloud records
+ * via `public.delete_my_account()` RPC (Apple App Store Guideline 5.1.1(v) & Google Play Data Safety).
+ * Falls back to deleting user data tables directly if the Phase 5 RPC hasn't been executed yet.
+ */
+export async function deleteCloudAccount(
+  userId: string
+): Promise<{ ok: boolean; error?: string }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { ok: false, error: 'Modo Local ativo — nenhuma conta na nuvem conectada.' };
+  }
+
+  try {
+    const rpcRes = await client.rpc('delete_my_account');
+    if (rpcRes.error) {
+      // Fallback: delete user rows directly if Phase 5 SQL migration hasn't been executed yet
+      await Promise.allSettled([
+        client.from('route_ratings').delete().eq('user_id', userId),
+        client.from('community_routes').delete().eq('author_id', userId),
+        client.from('ride_sessions').delete().eq('user_id', userId),
+        client.from('hazard_reports').delete().eq('user_id', userId),
+        client.from('custom_vehicles').delete().eq('user_id', userId),
+        client.from('saved_places').delete().eq('user_id', userId),
+        client.from('saved_routes').delete().eq('user_id', userId),
+        client.from('user_preferences').delete().eq('user_id', userId),
+        client.from('profiles').delete().eq('id', userId),
+      ]);
+    }
+    await signOut();
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: mapAuthErrorPtBr(err) };
   }
 }
 

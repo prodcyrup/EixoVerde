@@ -37,6 +37,7 @@ import { downloadTextFile, encodeShareableRouteUrl, exportRouteToGpx } from '../
 import { searchPlaces } from '../../engine/routing';
 import { computeRouteTelemetry } from '../../engine/telemetry';
 import { computeRouteMainBearingDeg } from '../../engine/weather';
+import { nativeShareUrl } from '../../mobile/nativeBridge';
 import { selectActiveVehicle, useAppStore } from '../../store/useAppStore';
 import type { PlaceResult, WeatherIconKind } from '../../types';
 import { ElevationProfile } from './ElevationProfile';
@@ -132,14 +133,10 @@ export function RoutePreviewPanel() {
   const handleShareLink = async () => {
     if (!activeRoute) return;
     const url = encodeShareableRouteUrl(activeRoute.title, activeRoute.waypoints, activeRoute.profile);
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: `EixoVerde • ${activeRoute.title}`, url });
-      } else {
-        await navigator.clipboard.writeText(url);
-        pushToast('Link copiado!', 'Envie para abrir esta rota diretamente no EixoVerde.', 'emerald');
-      }
-    } catch {
+    const res = await nativeShareUrl({ title: `EixoVerde • ${activeRoute.title}`, url });
+    if (res === 'copied') {
+      pushToast('Link copiado!', 'Envie para abrir esta rota diretamente no EixoVerde.', 'emerald');
+    } else if (res === 'failed') {
       pushToast('Link pronto', url, 'slate');
     }
   };
