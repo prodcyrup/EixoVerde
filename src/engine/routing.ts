@@ -162,11 +162,22 @@ function parseOrsGeoJsonFeature(
   };
 }
 
+let orsProxyCircuitOpen = false;
+
+export function isOrsProxyCircuitOpen(): boolean {
+  return orsProxyCircuitOpen;
+}
+
+export function resetOrsProxyCircuitBreakerForTests(): void {
+  orsProxyCircuitOpen = false;
+}
+
 async function fetchOrsProxyCandidate(
   waypoints: LngLat[],
   meta: ProfileMeta,
   accessToken: string | null
 ): Promise<RouteCandidate | null> {
+  if (orsProxyCircuitOpen) return null;
   const proxyUrl = getOrsProxyUrl();
   const cfg = getSupabaseConfig();
   if (!proxyUrl || !cfg) return null;
@@ -196,12 +207,18 @@ async function fetchOrsProxyCandidate(
           instructions: false,
         }),
       },
-      9500
+      7500
     );
+    if (res.status === 404 || res.status === 405 || res.status === 502 || res.status === 503) {
+      orsProxyCircuitOpen = true;
+      return null;
+    }
     if (!res.ok) return null;
     const json = await res.json();
     return parseOrsGeoJsonFeature(json, waypoints, meta);
   } catch {
+    // Open circuit on CORS preflight / unreachable Edge Function so subsequent route swaps have zero console noise
+    orsProxyCircuitOpen = true;
     return null;
   }
 }

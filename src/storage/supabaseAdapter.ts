@@ -1,5 +1,6 @@
 import { getSupabaseClient } from '../cloud/supabaseClient';
 import type {
+  CommunityRoute,
   Coord3D,
   HazardKind,
   HazardReport,
@@ -8,6 +9,8 @@ import type {
   RideSession,
   RideTrackPoint,
   RouteProfileId,
+  RouteRatingAggregate,
+  RouteSafetyTag,
   SavedPlace,
   SavedPlaceCategory,
   SavedRoute,
@@ -41,7 +44,8 @@ export function isMissingTableError(err: { message?: string; code?: string; stat
     code === '42P01' ||
     code === 'PGRST205' ||
     err.status === 404 ||
-    (msg.includes('ride_sessions') && (msg.includes('does not exist') || msg.includes('schema cache') || msg.includes('not found')))
+    ((msg.includes('ride_sessions') || msg.includes('community_routes') || msg.includes('route_ratings')) &&
+      (msg.includes('does not exist') || msg.includes('schema cache') || msg.includes('not found')))
   );
 }
 
@@ -608,7 +612,260 @@ export const supabaseAdapter = {
       throwFromSupabaseError(error);
     }
   },
+
+  async pullCommunityRoutes(): Promise<CommunityRoute[]> {
+    const client = getSupabaseClient();
+    if (!client) return [];
+
+    const { data, error } = await client
+      .from('community_routes')
+      .select('*')
+      .is('deleted_at', null)
+      .order('avg_rating', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(60);
+
+    if (error) {
+      if (isMissingTableError(error)) return [];
+      throwFromSupabaseError(error);
+    }
+
+    return ((data ?? []) as CommunityRouteRow[]).map(rowToCommunityRoute);
+  },
+
+  async publishCommunityRoute(
+    userId: string,
+    route: SavedRoute,
+    authorName: string
+  ): Promise<CommunityRoute | null> {
+    const client = getSupabaseClient();
+    if (!client) return null;
+
+    const now = new Date().toISOString();
+    const id = route.id.startsWith('comm-') ? route.id : `comm-${route.id}`;
+    const payload = {
+      id,
+      author_id: userId,
+      author_name: authorName || 'Ciclista DF',
+      name: route.name,
+      description: route.description ?? null,
+      tag: 'Comunidade DF',
+      difficulty: route.difficulty || 'Fácil',
+      city: route.city || 'Brasília, DF',
+      profile: route.profile || 'safe',
+      coords: route.coords,
+      waypoints: route.waypoints,
+      distance_km: Math.max(0, Number(route.distanceKm) || 0),
+      ascent_m: Math.max(0, Math.round(route.ascentM || 0)),
+      descent_m: Math.max(0, Math.round(route.descentM || 0)),
+      safety_score: Math.min(100, Math.max(0, Math.round(route.safetyScore || 75))),
+      origin_name: route.originName ?? null,
+      dest_name: route.destName ?? null,
+      created_at: now,
+      updated_at: now,
+      deleted_at: null,
+    };
+
+    const { data, error } = await client
+      .from('community_routes')
+      .upsert(payload, { onConflict: 'id' })
+      .select('*')
+      .maybeSingle();
+
+    if (error) {
+      if (isMissingTableError(error)) return null;
+      throwFromSupabaseError(error);
+    }
+    if (!data) {
+      return {
+        ...route,
+        id,
+        tag: 'Comunidade DF',
+        authorId: userId,
+        authorName: authorName || 'Ciclista DF',
+        avgRating: 0,
+        ratingCount: 0,
+        safetyTags: [],
+        isCommunity: true,
+        updatedAt: now,
+      };
+    }
+    return rowToCommunityRoute(data as CommunityRouteRow);
+  },
+
+  async deleteCommunityRoute(userId: string, id: string): Promise<void> {
+    const client = getSupabaseClient();
+    if (!client) return;
+
+    const now = new Date().toISOString();
+    const { error } = await client
+      .from('community_routes')
+      .update({ deleted_at: now, updated_at: now })
+      .eq('id', id)
+      .eq('author_id', userId);
+
+    if (error) {
+      if (isMissingTableError(error)) return;
+      throwFromSupabaseError(error);
+    }
+  },
+
+  async pullRouteRatings(currentUserId?: string | null): Promise<Record<string, RouteRatingAggregate>> {
+    const client = getSupabaseClient();
+    if (!client) return {};
+
+    const { data, error } = await client
+      .from('route_ratings')
+      .select('route_id, user_id, rating, tags')
+      .limit(1000);
+
+    if (error) {
+      if (isMissingTableError(error)) return {};
+      throwFromSupabaseError(error);
+    }
+
+    const rows = (data ?? []) as RouteRatingRow[];
+    const byRoute = new Map<
+      string,
+      {
+        sum: number;
+        count: number;
+        tagCounts: Map<RouteSafetyTag, number>;
+        userRating?: number;
+        userTags?: RouteSafetyTag[];
+      }
+    >();
+
+    for (const row of rows) {
+      const entry = byRoute.get(row.route_id) ?? {
+        sum: 0,
+        count: 0,
+        tagCounts: new Map<RouteSafetyTag, number>(),
+      };
+      const ratingVal = Math.max(1, Math.min(5, Number(row.rating) || 5));
+      entry.sum += ratingVal;
+      entry.count += 1;
+      const tags = Array.isArray(row.tags) ? (row.tags as RouteSafetyTag[]) : [];
+      for (const tag of tags) {
+        entry.tagCounts.set(tag, (entry.tagCounts.get(tag) ?? 0) + 1);
+      }
+      if (currentUserId && row.user_id === currentUserId) {
+        entry.userRating = ratingVal;
+        entry.userTags = tags;
+      }
+      byRoute.set(row.route_id, entry);
+    }
+
+    const result: Record<string, RouteRatingAggregate> = {};
+    for (const [routeId, agg] of byRoute.entries()) {
+      const topTags = Array.from(agg.tagCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([t]) => t);
+      result[routeId] = {
+        routeId,
+        avgRating: agg.count > 0 ? +(agg.sum / agg.count).toFixed(1) : 0,
+        ratingCount: agg.count,
+        topTags,
+        userRating: agg.userRating,
+        userTags: agg.userTags,
+      };
+    }
+    return result;
+  },
+
+  async upsertRouteRating(
+    userId: string,
+    routeId: string,
+    rating: number,
+    tags: RouteSafetyTag[]
+  ): Promise<boolean> {
+    const client = getSupabaseClient();
+    if (!client) return false;
+
+    const cleanRating = Math.max(1, Math.min(5, Math.round(rating)));
+    const { error } = await client
+      .from('route_ratings')
+      .upsert(
+        {
+          route_id: routeId,
+          user_id: userId,
+          rating: cleanRating,
+          tags,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'route_id,user_id' }
+      );
+
+    if (error) {
+      if (isMissingTableError(error)) return false;
+      throwFromSupabaseError(error);
+    }
+    return true;
+  },
 };
+
+interface CommunityRouteRow {
+  id: string;
+  author_id: string;
+  author_name: string;
+  name: string;
+  description: string | null;
+  tag: string;
+  difficulty: 'Fácil' | 'Moderado' | 'Desafiador';
+  city: string;
+  profile: RouteProfileId;
+  coords: Coord3D[];
+  waypoints: LngLat[];
+  distance_km: number;
+  ascent_m: number;
+  descent_m: number;
+  safety_score: number;
+  origin_name: string | null;
+  dest_name: string | null;
+  avg_rating: number;
+  rating_count: number;
+  safety_tags: RouteSafetyTag[] | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+interface RouteRatingRow {
+  route_id: string;
+  user_id: string;
+  rating: number;
+  tags: string[] | null;
+}
+
+function rowToCommunityRoute(r: CommunityRouteRow): CommunityRoute {
+  return {
+    id: r.id,
+    name: r.name,
+    description: r.description ?? undefined,
+    tag: r.tag || 'Comunidade DF',
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    isFavorite: false,
+    difficulty: r.difficulty || 'Fácil',
+    city: r.city || 'Brasília, DF',
+    profile: r.profile || 'safe',
+    coords: Array.isArray(r.coords) ? r.coords : [],
+    waypoints: Array.isArray(r.waypoints) ? r.waypoints : [],
+    distanceKm: Number(r.distance_km) || 0,
+    ascentM: Number(r.ascent_m) || 0,
+    descentM: Number(r.descent_m) || 0,
+    safetyScore: Number(r.safety_score) || 75,
+    originName: r.origin_name ?? undefined,
+    destName: r.dest_name ?? undefined,
+    authorId: r.author_id,
+    authorName: r.author_name || 'Ciclista DF',
+    avgRating: Number(r.avg_rating) || 0,
+    ratingCount: Number(r.rating_count) || 0,
+    safetyTags: Array.isArray(r.safety_tags) ? r.safety_tags : [],
+    isCommunity: true,
+  };
+}
 
 interface RideSessionRow {
   user_id: string;

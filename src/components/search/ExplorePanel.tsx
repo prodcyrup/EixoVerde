@@ -4,6 +4,7 @@ import {
   Briefcase,
   Check,
   Compass,
+  Globe,
   Heart,
   Home,
   LocateFixed,
@@ -16,6 +17,7 @@ import {
   ShieldCheck,
   Star,
   Trash2,
+  Users,
   X,
 } from 'lucide-react';
 import { BRAND } from '../../config/brand';
@@ -23,8 +25,24 @@ import { formatDurationPtBR } from '../../engine/geo';
 import { searchPlaces } from '../../engine/routing';
 import { computeRouteTelemetry } from '../../engine/telemetry';
 import { selectActiveVehicle, useAppStore } from '../../store/useAppStore';
-import type { PlaceResult, SavedPlace, SavedPlaceCategory, SavedRoute } from '../../types';
+import type {
+  CommunityRoute,
+  PlaceResult,
+  RouteSafetyTag,
+  SavedPlace,
+  SavedPlaceCategory,
+  SavedRoute,
+} from '../../types';
 import { RidesHistoryPanel } from '../rides/RidesHistoryPanel';
+
+const SAFETY_TAG_OPTIONS: Array<{ id: RouteSafetyTag; label: string }> = [
+  { id: 'bom_asfalto', label: 'Bom asfalto' },
+  { id: 'iluminada', label: 'Iluminada' },
+  { id: 'sombra', label: 'Sombra' },
+  { id: 'paisagem', label: 'Paisagem' },
+  { id: 'cruzamento_tenso', label: 'Cruzamento tenso' },
+  { id: 'muito_movimento', label: 'Muito movimento' },
+];
 
 export function ExplorePanel() {
   const [query, setQuery] = useState('');
@@ -38,6 +56,11 @@ export function ExplorePanel() {
   const [renamingRouteId, setRenamingRouteId] = useState<string | null>(null);
   const [renameRouteVal, setRenameRouteVal] = useState('');
 
+  // Phase 4: Inline 1-5★ rating & safety tag picker state
+  const [ratingRouteId, setRatingRouteId] = useState<string | null>(null);
+  const [draftStars, setDraftStars] = useState<number>(5);
+  const [draftTags, setDraftTags] = useState<RouteSafetyTag[]>([]);
+
   // Inline Add Place search inside "Meus Locais"
   const [addingPlaceFor, setAddingPlaceFor] = useState<null | SavedPlaceCategory>(null);
   const [addPlaceQuery, setAddPlaceQuery] = useState('');
@@ -46,6 +69,9 @@ export function ExplorePanel() {
   const exploreTab = useAppStore((s) => s.exploreTab);
   const setExploreTab = useAppStore((s) => s.setExploreTab);
   const savedRoutes = useAppStore((s) => s.savedRoutes);
+  const communityRoutes = useAppStore((s) => s.communityRoutes);
+  const routeRatings = useAppStore((s) => s.routeRatings);
+  const authUser = useAppStore((s) => s.authUser);
   const savedPlaces = useAppStore((s) => s.savedPlaces);
   const rideSessions = useAppStore((s) => s.rideSessions);
   const startFreeRide = useAppStore((s) => s.startFreeRide);
@@ -53,6 +79,9 @@ export function ExplorePanel() {
   const toggleFavoriteRoute = useAppStore((s) => s.toggleFavoriteRoute);
   const renameSavedRoute = useAppStore((s) => s.renameSavedRoute);
   const deleteSavedRoute = useAppStore((s) => s.deleteSavedRoute);
+  const rateRoute = useAppStore((s) => s.rateRoute);
+  const publishSavedRouteToCommunity = useAppStore((s) => s.publishSavedRouteToCommunity);
+  const deleteCommunityRoute = useAppStore((s) => s.deleteCommunityRoute);
   const setDestination = useAppStore((s) => s.setDestination);
   const setMapPickTarget = useAppStore((s) => s.setMapPickTarget);
   const mapPickTarget = useAppStore((s) => s.mapPickTarget);
@@ -122,7 +151,27 @@ export function ExplorePanel() {
   const workSaved = savedPlaces.find((p) => p.category === 'work');
   const favoritePlaces = savedPlaces.filter((p) => p.category === 'favorite');
 
-  const renderRouteCard = (route: SavedRoute, showSavedBadge = false) => {
+  const openRatingEditor = (routeId: string) => {
+    if (ratingRouteId === routeId) {
+      setRatingRouteId(null);
+      return;
+    }
+    const existing = routeRatings[routeId];
+    setRatingRouteId(routeId);
+    setDraftStars(existing?.userRating ?? Math.max(1, Math.round(existing?.avgRating || 5)));
+    setDraftTags(existing?.userTags ?? []);
+  };
+
+  const toggleDraftTag = (tag: RouteSafetyTag) => {
+    setDraftTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
+  };
+
+  const renderRouteCard = (
+    route: SavedRoute | CommunityRoute,
+    opts: { showSavedBadge?: boolean; isCommunityCard?: boolean } = {}
+  ) => {
+    const { showSavedBadge = false, isCommunityCard = false } = opts;
+    const communityMeta = isCommunityCard ? (route as CommunityRoute) : null;
     const telemetry = computeRouteTelemetry(
       {
         distanceKm: route.distanceKm,
@@ -150,12 +199,20 @@ export function ExplorePanel() {
     );
 
     const isRenaming = renamingRouteId === route.id;
+    const isRatingOpen = ratingRouteId === route.id;
+    const agg = routeRatings[route.id];
+    const displayAvg = agg?.avgRating || communityMeta?.avgRating || 0;
+    const displayCount = agg?.ratingCount || communityMeta?.ratingCount || 0;
+    const displayTags = agg?.topTags?.length ? agg.topTags : (communityMeta?.safetyTags ?? []);
+    const canRate = Boolean(route.isCurated || isCommunityCard);
+    const canPublish = Boolean(!route.isCurated && !isCommunityCard);
+    const isCommunityOwner = Boolean(isCommunityCard && authUser && communityMeta?.authorId === authUser.id);
 
     return (
       <div
-        key={`${showSavedBadge ? 'saved-' : 'bsb-'}${route.id}`}
+        key={`${showSavedBadge ? 'saved-' : isCommunityCard ? 'comm-' : 'bsb-'}${route.id}`}
         onClick={() => {
-          if (!isRenaming) loadSavedRoute(route);
+          if (!isRenaming && !isRatingOpen) loadSavedRoute(route);
         }}
         className="group cursor-pointer rounded-2xl border border-slate-200/80 bg-white/90 p-3.5 transition-all hover:border-emerald-500/40 hover:shadow-md dark:border-slate-700/70 dark:bg-slate-800/70 dark:hover:border-emerald-500/40"
       >
@@ -177,7 +234,13 @@ export function ExplorePanel() {
                 <ShieldCheck className="h-3 w-3" />
                 {route.safetyScore}% segura
               </span>
-              <span className="text-[10px] font-medium text-slate-400">• {route.city}</span>
+              {communityMeta ? (
+                <span className="text-[10px] font-semibold text-sky-600 dark:text-sky-400">
+                  • por {communityMeta.authorName}
+                </span>
+              ) : (
+                <span className="text-[10px] font-medium text-slate-400">• {route.city}</span>
+              )}
             </div>
 
             {isRenaming ? (
@@ -224,10 +287,41 @@ export function ExplorePanel() {
                 {route.description}
               </p>
             )}
+
+            {displayTags.length > 0 && !isRenaming && (
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {displayTags.slice(0, 3).map((tagId) => {
+                  const found = SAFETY_TAG_OPTIONS.find((t) => t.id === tagId);
+                  return (
+                    <span
+                      key={tagId}
+                      className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-700/80 dark:text-slate-300"
+                    >
+                      {found?.label || tagId}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="flex shrink-0 items-center gap-0.5">
-            {!route.isCurated && (
+            {canPublish && (
+              <button
+                type="button"
+                data-publish-route={route.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void publishSavedRouteToCommunity(route.id);
+                }}
+                aria-label="Publicar na Comunidade DF"
+                title="Publicar na Comunidade DF"
+                className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/50"
+              >
+                <Globe className="h-3.5 w-3.5" />
+              </button>
+            )}
+            {!route.isCurated && !isCommunityCard && (
               <button
                 type="button"
                 onClick={(e) => {
@@ -242,18 +336,20 @@ export function ExplorePanel() {
                 <Pencil className="h-3.5 w-3.5" />
               </button>
             )}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                void toggleFavoriteRoute(route.id);
-              }}
-              aria-label="Favoritar rota"
-              className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-rose-500 dark:hover:bg-slate-700"
-            >
-              <Heart className={`h-4 w-4 ${route.isFavorite ? 'fill-rose-500 text-rose-500' : ''}`} />
-            </button>
-            {!route.isCurated && (
+            {!isCommunityCard && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void toggleFavoriteRoute(route.id);
+                }}
+                aria-label="Favoritar rota"
+                className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-rose-500 dark:hover:bg-slate-700"
+              >
+                <Heart className={`h-4 w-4 ${route.isFavorite ? 'fill-rose-500 text-rose-500' : ''}`} />
+              </button>
+            )}
+            {!route.isCurated && !isCommunityCard && (
               <button
                 type="button"
                 onClick={(e) => {
@@ -266,23 +362,127 @@ export function ExplorePanel() {
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
             )}
+            {isCommunityOwner && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void deleteCommunityRoute(route.id);
+                }}
+                aria-label="Remover da Comunidade DF"
+                title="Remover da Comunidade DF"
+                className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/50"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="font-mono-num mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2 text-xs dark:border-slate-700/60">
-          <div className="flex items-center gap-3 text-slate-700 dark:text-slate-300">
+        <div className="font-mono-num mt-2.5 flex items-center justify-between gap-2 border-t border-slate-100 pt-2 text-xs dark:border-slate-700/60">
+          <div className="flex items-center gap-2.5 text-slate-700 dark:text-slate-300">
             <span className="font-bold text-emerald-700 dark:text-emerald-400">
               {formatDurationPtBR(telemetry.oneWayMin)}
             </span>
             <span>{route.distanceKm.toFixed(1).replace('.', ',')} km</span>
             <span className="text-slate-500 dark:text-slate-400">↗ {route.ascentM}m</span>
           </div>
-          {activeVehicle.isElectric && (
-            <span className="rounded-md bg-sky-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-sky-700 dark:text-sky-300">
-              -{telemetry.batteryUsedPct}% bat.
-            </span>
-          )}
+
+          <div className="flex items-center gap-1.5">
+            {canRate && (
+              <button
+                type="button"
+                data-rate-route={route.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openRatingEditor(route.id);
+                }}
+                className="inline-flex items-center gap-1 rounded-md bg-amber-500/12 px-1.5 py-0.5 text-[11px] font-bold text-amber-700 transition-colors hover:bg-amber-500/20 dark:text-amber-300"
+              >
+                <Star className={`h-3 w-3 ${displayCount > 0 ? 'fill-amber-500 text-amber-500' : 'text-amber-500'}`} />
+                {displayCount > 0 ? `${displayAvg.toFixed(1)} (${displayCount})` : 'Avaliar'}
+              </button>
+            )}
+            {activeVehicle.isElectric && (
+              <span className="rounded-md bg-sky-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-sky-700 dark:text-sky-300">
+                -{telemetry.batteryUsedPct}%
+              </span>
+            )}
+          </div>
         </div>
+
+        {/* Inline 1-5★ Star Rating & Safety Tags Picker */}
+        {isRatingOpen && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="mt-2.5 space-y-2 rounded-xl border border-amber-500/30 bg-amber-50/60 p-2.5 dark:bg-slate-900/80"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-extrabold text-slate-800 dark:text-slate-100">
+                Avaliar segurança desta rota
+              </span>
+              <div className="flex items-center gap-0.5">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    aria-label={`${star} estrelas`}
+                    data-star-value={star}
+                    onClick={() => setDraftStars(star)}
+                    className="p-0.5"
+                  >
+                    <Star
+                      className={`h-4 w-4 ${
+                        star <= draftStars ? 'fill-amber-500 text-amber-500' : 'text-slate-300 dark:text-slate-600'
+                      }`}
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-1">
+              {SAFETY_TAG_OPTIONS.map((tag) => {
+                const selected = draftTags.includes(tag.id);
+                return (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => toggleDraftTag(tag.id)}
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors ${
+                      selected
+                        ? 'bg-emerald-600 text-white'
+                        : 'border border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                    }`}
+                  >
+                    {tag.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-end gap-1.5">
+              <button
+                type="button"
+                onClick={() => setRatingRouteId(null)}
+                className="rounded-lg px-2.5 py-1 text-[11px] font-semibold text-slate-500 hover:bg-slate-200/60 dark:text-slate-400"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                data-submit-rating={route.id}
+                onClick={async () => {
+                  await rateRoute(route.id, draftStars, draftTags);
+                  setRatingRouteId(null);
+                }}
+                className="rounded-lg bg-emerald-600 px-3 py-1 text-[11px] font-extrabold text-white hover:bg-emerald-500"
+              >
+                Salvar {draftStars}★
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -402,60 +602,66 @@ export function ExplorePanel() {
         )}
       </div>
 
-      {/* Quick Action Strip (Home / Work / Pick on Map / Save Point on Map) */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 ev-scroll">
-        {homePlace && (
-          <button
-            type="button"
-            onClick={() => void setDestination(homePlace, true)}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-emerald-500/40 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-          >
-            <Home className="h-3.5 w-3.5 text-emerald-600" />
-            {homePlace.name}
-          </button>
-        )}
-        {workPlace && (
-          <button
-            type="button"
-            onClick={() => void setDestination(workPlace, true)}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-emerald-500/40 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-          >
-            <Briefcase className="h-3.5 w-3.5 text-sky-600" />
-            {workPlace.name}
-          </button>
-        )}
+      {/* Home / Work Quick Chips (only when defined) */}
+      {(homePlace || workPlace) && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {homePlace && (
+            <button
+              type="button"
+              onClick={() => void setDestination(homePlace, true)}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:border-emerald-500/40 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            >
+              <Home className="h-3.5 w-3.5 text-emerald-600" />
+              {homePlace.name}
+            </button>
+          )}
+          {workPlace && (
+            <button
+              type="button"
+              onClick={() => void setDestination(workPlace, true)}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 hover:border-emerald-500/40 hover:text-emerald-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            >
+              <Briefcase className="h-3.5 w-3.5 text-sky-600" />
+              {workPlace.name}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Primary Quick Actions Grid — fits all 3 buttons cleanly with zero right-edge clipping on 375px iPhone SE */}
+      <div id="eixoverde-quick-actions" className="grid grid-cols-3 gap-1.5">
         <button
           id="eixoverde-freeride-chip"
           type="button"
           onClick={startFreeRide}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-600/30 bg-emerald-600/10 px-3 py-1.5 text-xs font-bold text-emerald-700 transition-colors hover:bg-emerald-600 hover:text-white dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-300"
+          className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full border border-emerald-600/30 bg-emerald-600/10 px-2 py-1.5 text-[11px] font-bold text-emerald-700 transition-colors hover:bg-emerald-600 hover:text-white dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-300"
         >
-          <Play className="h-3 w-3 fill-current" />
+          <Play className="h-3 w-3 shrink-0 fill-current" />
           Pedal Livre
         </button>
         <button
           type="button"
           onClick={() => setMapPickTarget(mapPickTarget === 'dest' ? null : 'dest')}
-          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+          className={`inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full border px-2 py-1.5 text-[11px] font-semibold transition-colors ${
             mapPickTarget === 'dest'
               ? 'border-emerald-600 bg-emerald-600 text-white'
               : 'border-slate-200 bg-white text-slate-700 hover:border-emerald-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200'
           }`}
         >
-          <MapPin className="h-3.5 w-3.5" />
-          {mapPickTarget === 'dest' ? 'Toque no mapa...' : 'Marcar no Mapa'}
+          <MapPin className="h-3 w-3 shrink-0" />
+          {mapPickTarget === 'dest' ? 'No mapa...' : 'Marcar Mapa'}
         </button>
         <button
           type="button"
           onClick={() => setMapPickTarget(mapPickTarget === 'save_place' ? null : 'save_place')}
-          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+          className={`inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full border px-2 py-1.5 text-[11px] font-semibold transition-colors ${
             mapPickTarget === 'save_place'
               ? 'border-amber-500 bg-amber-500 text-slate-950'
               : 'border-slate-200 bg-white text-slate-700 hover:border-amber-500/40 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200'
           }`}
         >
-          <Star className="h-3.5 w-3.5 text-amber-500" />
-          {mapPickTarget === 'save_place' ? 'Toque no local...' : 'Salvar Local'}
+          <Star className="h-3 w-3 shrink-0 text-amber-500" />
+          {mapPickTarget === 'save_place' ? 'No local...' : 'Salvar Local'}
         </button>
       </div>
 
@@ -500,7 +706,7 @@ export function ExplorePanel() {
         </button>
       </div>
 
-      {/* TAB 1: ROTAS (Saved Routes first, then Brasília Routes below) */}
+      {/* TAB 1: ROTAS (Saved Routes, Comunidade DF, Brasília Curated Routes) */}
       {exploreTab === 'rides' ? (
         <RidesHistoryPanel />
       ) : exploreTab === 'routes' ? (
@@ -513,7 +719,9 @@ export function ExplorePanel() {
               </h2>
             </div>
             {userSavedRoutes.length > 0 ? (
-              <div className="space-y-2">{userSavedRoutes.map((r) => renderRouteCard(r, true))}</div>
+              <div className="space-y-2">
+                {userSavedRoutes.map((r) => renderRouteCard(r, { showSavedBadge: true }))}
+              </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-4 text-center dark:border-slate-700">
                 <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
@@ -526,12 +734,33 @@ export function ExplorePanel() {
             )}
           </div>
 
+          {/* Comunidade DF (Shared Routes with 1-5★ ratings) */}
+          <div id="eixoverde-community-routes" className="space-y-2">
+            <div className="flex items-center justify-between px-0.5">
+              <h2 className="inline-flex items-center gap-1 text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <Users className="h-3 w-3 text-emerald-600" />
+                Comunidade DF ({communityRoutes.length})
+              </h2>
+            </div>
+            {communityRoutes.length > 0 ? (
+              <div className="space-y-2">
+                {communityRoutes.map((r) => renderRouteCard(r, { isCommunityCard: true }))}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-200 px-3.5 py-3 text-center dark:border-slate-700/80">
+                <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  Salve uma rota e toque no ícone <Globe className="inline h-3 w-3 text-emerald-600" /> para compartilhar com ciclistas do DF.
+                </p>
+              </div>
+            )}
+          </div>
+
           {/* Rotas em Brasília (Bottom) */}
           <div className="space-y-2">
             <h2 className="px-0.5 text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               Rotas em Brasília
             </h2>
-            <div className="space-y-2">{brasiliaRoutes.map((r) => renderRouteCard(r, false))}</div>
+            <div className="space-y-2">{brasiliaRoutes.map((r) => renderRouteCard(r))}</div>
           </div>
         </div>
       ) : (

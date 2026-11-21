@@ -8,7 +8,10 @@ export function ToastStack() {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="pointer-events-none fixed right-3 top-3 z-50 flex w-[calc(100%-24px)] max-w-sm flex-col gap-2 safe-top">
+    <div
+      id="eixoverde-toast-stack"
+      className="pointer-events-none fixed left-1/2 top-3 z-50 flex w-[calc(100%-24px)] max-w-sm -translate-x-1/2 flex-col gap-2 safe-top lg:left-[calc(50%+215px)]"
+    >
       {toasts.map((t) => {
         const accent =
           t.tone === 'emerald'

@@ -95,6 +95,8 @@ export function RoutePreviewPanel() {
   const setGarageOpen = useAppStore((s) => s.setGarageOpen);
   const navPos = useAppStore((s) => s.nav.currentPos);
   const pushToast = useAppStore((s) => s.pushToast);
+  const showSafetySegments = useAppStore((s) => s.showSafetySegments);
+  const toggleSafetySegments = useAppStore((s) => s.toggleSafetySegments);
 
   const activeRoute = candidates[selectedCandidateIdx];
   const activeCalibration = batteryCalibrations[activeVehicle.id] ?? null;
@@ -692,6 +694,50 @@ export function RoutePreviewPanel() {
                     <span>{telemetry.comfortWarning}</span>
                   </div>
                 )}
+
+                {/* Phase 4: Color-Coded Safety & Surface Route Segments Toggle + Legend */}
+                <div
+                  id="eixoverde-safety-segments-legend"
+                  className="rounded-xl border border-slate-200/75 bg-slate-50/90 px-2.5 py-2 dark:border-slate-700/70 dark:bg-slate-900/55"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                      Cores de segurança no mapa
+                    </span>
+                    <button
+                      id="eixoverde-safety-segments-toggle"
+                      type="button"
+                      onClick={toggleSafetySegments}
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold transition-colors ${
+                        showSafetySegments
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      {showSafetySegments ? 'Ativo' : 'Oculto'}
+                    </button>
+                  </div>
+                  {showSafetySegments && (
+                    <div className="mt-1.5 grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] font-semibold text-slate-600 dark:text-slate-300 sm:grid-cols-4">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-2 w-3.5 shrink-0 rounded-full bg-emerald-500" />
+                        Ciclovia
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-2 w-3.5 shrink-0 rounded-full bg-sky-500" />
+                        Ciclofaixa
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-2 w-3.5 shrink-0 rounded-full bg-amber-500" />
+                        Via Calma
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-2 w-3.5 shrink-0 rounded-full bg-rose-500" />
+                        Via Comum
+                      </span>
+                    </div>
+                  )}
+                </div>
 
                 {/* Elevation & Way-Type Surface Analytics */}
                 <ElevationProfile route={activeRoute} />

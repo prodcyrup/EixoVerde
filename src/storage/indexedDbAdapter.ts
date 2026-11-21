@@ -1,6 +1,7 @@
 import type {
   HazardReport,
   RideSession,
+  RouteRatingRecord,
   SavedPlace,
   SavedRoute,
   SyncOutboxItem,
@@ -11,13 +12,14 @@ import type {
 import type { StorageAdapter } from './adapter';
 
 export const DB_NAME = 'eixoverde_db_v1';
-export const DB_VERSION = 4;
+export const DB_VERSION = 5;
 export const STORES = {
   routes: 'saved_routes',
   places: 'saved_places',
   vehicles: 'custom_vehicles',
   hazards: 'hazard_reports',
   rides: 'ride_sessions',
+  ratings: 'route_ratings',
   meta: 'user_meta',
   outbox: 'sync_outbox',
   tombstones: 'sync_tombstones',
@@ -32,6 +34,7 @@ const memoryStores: Record<string, Map<string, unknown>> = {
   [STORES.vehicles]: new Map(),
   [STORES.hazards]: new Map(),
   [STORES.rides]: new Map(),
+  [STORES.ratings]: new Map(),
   [STORES.meta]: new Map(),
   [STORES.outbox]: new Map(),
   [STORES.tombstones]: new Map(),
@@ -67,6 +70,9 @@ function openDB(): Promise<IDBDatabase> {
         }
         if (!db.objectStoreNames.contains(STORES.rides)) {
           db.createObjectStore(STORES.rides, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains(STORES.ratings)) {
+          db.createObjectStore(STORES.ratings, { keyPath: 'routeId' });
         }
         if (!db.objectStoreNames.contains(STORES.meta)) {
           db.createObjectStore(STORES.meta);
@@ -107,6 +113,9 @@ function getRecordKey(storeName: string, item: unknown): string {
   const obj = item as Record<string, unknown>;
   if (storeName === STORES.tombstones && typeof obj?.key === 'string') {
     return obj.key;
+  }
+  if (storeName === STORES.ratings && typeof obj?.routeId === 'string') {
+    return obj.routeId;
   }
   if (typeof obj?.id === 'string') {
     return obj.id;
@@ -176,6 +185,9 @@ async function clearStore(storeName: string): Promise<void> {
 }
 
 export interface ExtendedIndexedDbStorage extends StorageAdapter {
+  getRouteRatings(): Promise<RouteRatingRecord[]>;
+  saveRouteRating(record: RouteRatingRecord): Promise<void>;
+
   getOutboxItems(): Promise<SyncOutboxItem[]>;
   putOutboxItem(item: SyncOutboxItem): Promise<void>;
   removeOutboxItem(id: string): Promise<void>;
@@ -264,6 +276,16 @@ export const indexedDbStorage: ExtendedIndexedDbStorage = {
   },
   async deleteRideSession(id) {
     await removeItem(STORES.rides, id);
+  },
+
+  async getRouteRatings() {
+    return getAll<RouteRatingRecord>(STORES.ratings);
+  },
+  async saveRouteRating(record) {
+    await putItem(STORES.ratings, {
+      ...record,
+      updatedAt: record.updatedAt || new Date().toISOString(),
+    });
   },
 
   async getPreferences() {
