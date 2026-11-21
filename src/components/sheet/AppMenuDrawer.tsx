@@ -6,6 +6,8 @@ import {
   CheckCircle2,
   Cloud,
   CloudOff,
+  Download,
+  HardDrive,
   Layers,
   Loader2,
   LogOut,
@@ -18,9 +20,11 @@ import {
   Sun,
   UserCheck,
   X,
+  Zap,
 } from 'lucide-react';
 import { BRAND } from '../../config/brand';
 import { hasMapTilerKey, hasOrsKey, hasSupabaseConfig } from '../../config/providers';
+import { isOrsProxyCircuitOpen } from '../../engine/routing';
 import { selectActiveVehicle, useAppStore } from '../../store/useAppStore';
 
 export function AppMenuDrawer() {
@@ -37,6 +41,7 @@ export function AppMenuDrawer() {
   const toggleBasemap = useAppStore((s) => s.toggleBasemap);
   const showBikeLanes = useAppStore((s) => s.showBikeLanes);
   const showPois = useAppStore((s) => s.showPois);
+  const showStations = useAppStore((s) => s.showStations);
   const showHazards = useAppStore((s) => s.showHazards);
   const toggleLayer = useAppStore((s) => s.toggleLayer);
   const activeVehicle = useAppStore(selectActiveVehicle);
@@ -53,9 +58,15 @@ export function AppMenuDrawer() {
   const syncNow = useAppStore((s) => s.syncNow);
   const signOut = useAppStore((s) => s.signOut);
 
+  const offlineCache = useAppStore((s) => s.offlineCache);
+  const offlineCacheLoading = useAppStore((s) => s.offlineCacheLoading);
+  const warmOfflineCache = useAppStore((s) => s.warmOfflineCache);
+  const realtimeConnected = useAppStore((s) => s.realtimeConnected);
+
   if (!open) return null;
 
   const supabaseEnabled = hasSupabaseConfig();
+  const orsProxyFallback = isOrsProxyCircuitOpen();
   const locationParts = [currentLocationPlace?.district, currentLocationPlace?.city].filter(Boolean);
   const locationLabel =
     locationParts.length > 0
@@ -101,6 +112,14 @@ export function AppMenuDrawer() {
   };
 
   const badgeMeta = getSyncBadgeMeta();
+
+  const routingEngineLabel = supabaseEnabled
+    ? orsProxyFallback
+      ? 'BRouter / OSRM (Fallback)'
+      : 'ORS Edge Proxy'
+    : hasOrsKey()
+      ? 'OpenRouteService'
+      : 'BRouter / OSRM';
 
   return (
     <div className="fixed inset-0 z-50 flex bg-slate-950/55 backdrop-blur-xs" onClick={() => setMenuOpen(false)}>
@@ -346,6 +365,21 @@ export function AppMenuDrawer() {
               </button>
 
               <button
+                id="eixoverde-stations-toggle"
+                type="button"
+                onClick={() => toggleLayer('stations')}
+                className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+              >
+                <span className="inline-flex items-center gap-2.5">
+                  <Zap className="h-4 w-4 text-orange-500" />
+                  Estações Tembici &amp; JET
+                </span>
+                <span className={`h-5 w-9 rounded-full p-0.5 transition-colors ${showStations ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700'}`}>
+                  <span className={`block h-4 w-4 rounded-full bg-white transition-transform ${showStations ? 'translate-x-4' : ''}`} />
+                </span>
+              </button>
+
+              <button
                 type="button"
                 onClick={() => toggleLayer('pois')}
                 className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -401,6 +435,50 @@ export function AppMenuDrawer() {
             </div>
           </div>
 
+          {/* Phase 4: 1-Tap Offline DF Cache Card */}
+          <div
+            id="eixoverde-offline-cache-card"
+            className="rounded-2xl border border-slate-200/80 bg-slate-50/90 p-3.5 dark:border-slate-800 dark:bg-slate-800/60"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <HardDrive className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-xs font-extrabold text-slate-900 dark:text-white">Cache Offline DF</span>
+              </div>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
+                  offlineCache.ready
+                    ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-slate-200/80 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                }`}
+              >
+                {offlineCache.ready ? 'Pronto Offline' : 'Não baixado'}
+              </span>
+            </div>
+            <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+              Salva a malha cicloviária do DF, estações Tembici &amp; JET e bicicletários para pedalar sem internet.
+            </p>
+            <button
+              id="eixoverde-warm-offline-btn"
+              type="button"
+              disabled={offlineCacheLoading}
+              onClick={() => void warmOfflineCache()}
+              className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-xl border border-emerald-500/35 bg-emerald-500/10 py-2 text-xs font-extrabold text-emerald-700 transition-colors hover:bg-emerald-500/20 disabled:opacity-60 dark:text-emerald-300"
+            >
+              {offlineCacheLoading ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Salvando dados do DF...
+                </>
+              ) : (
+                <>
+                  <Download className="h-3.5 w-3.5" />
+                  {offlineCache.ready ? 'Atualizar Cache DF' : 'Baixar Mapa Offline DF'}
+                </>
+              )}
+            </button>
+          </div>
+
           {/* Engine & Cloud Status */}
           <div className="space-y-2 rounded-2xl bg-slate-100/80 p-3.5 text-xs dark:bg-slate-800/60">
             <div className="font-bold text-slate-700 dark:text-slate-200">Motores Ativos</div>
@@ -413,7 +491,7 @@ export function AppMenuDrawer() {
             <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
               <span>Roteamento Seguro</span>
               <span className="font-semibold text-emerald-700 dark:text-emerald-400">
-                {supabaseEnabled ? 'ORS Edge Proxy' : hasOrsKey() ? 'OpenRouteService' : 'BRouter / OSRM'}
+                {routingEngineLabel}
               </span>
             </div>
             <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
@@ -423,7 +501,11 @@ export function AppMenuDrawer() {
             <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
               <span>Sincronização</span>
               <span className="font-semibold text-emerald-700 dark:text-emerald-400">
-                {supabaseEnabled ? 'Supabase Cloud + Offline' : 'IndexedDB Offline-First'}
+                {supabaseEnabled
+                  ? realtimeConnected
+                    ? 'Supabase Realtime + Offline'
+                    : 'Supabase Cloud + Offline'
+                  : 'IndexedDB Offline-First'}
               </span>
             </div>
           </div>

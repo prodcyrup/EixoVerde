@@ -2,14 +2,18 @@ import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import { BRAND } from '../../config/brand';
 import { getMapStyle } from '../../config/providers';
+import { buildMobilityStationsCollection } from '../../data/mobilityStations';
 import { buildLaneSpatialIndex, normalizeAngleDiff } from '../../engine/geo';
+import { buildSafetyRouteSegments } from '../../engine/routeSegments';
 import { useAppStore } from '../../store/useAppStore';
 import type { LngLat } from '../../types';
 
 const SRC_LANES = 'ev-ciclomapa-lanes';
 const SRC_POIS = 'ev-ciclomapa-pois';
+const SRC_STATIONS = 'ev-mobility-stations';
 const SRC_ALT_ROUTES = 'ev-alt-routes';
 const SRC_ACTIVE_ROUTE = 'ev-active-route';
+const SRC_ROUTE_SAFETY = 'ev-active-route-safety';
 const SRC_COMPLETED_ROUTE = 'ev-completed-route';
 const SRC_RIDE_TRACK = 'ev-ride-track';
 
@@ -19,6 +23,7 @@ export function EixoVerdeMap() {
   const styleReadyRef = useRef(false);
   const lanesDataRef = useRef<GeoJSON.FeatureCollection | null>(null);
   const poisDataRef = useRef<GeoJSON.FeatureCollection | null>(null);
+  const stationsDataRef = useRef<GeoJSON.FeatureCollection>(buildMobilityStationsCollection(null).geojson);
 
   const waypointMarkersRef = useRef<maplibregl.Marker[]>([]);
   const crossingMarkersRef = useRef<maplibregl.Marker[]>([]);
@@ -26,6 +31,7 @@ export function EixoVerdeMap() {
   const savedPlaceMarkersRef = useRef<maplibregl.Marker[]>([]);
   const replayMarkersRef = useRef<maplibregl.Marker[]>([]);
   const contextPinMarkerRef = useRef<maplibregl.Marker | null>(null);
+  const lastCenteredContextKeyRef = useRef<string | null>(null);
   const gpsMarkerRef = useRef<maplibregl.Marker | null>(null);
   const hoverMarkerRef = useRef<maplibregl.Marker | null>(null);
   const smoothedHeadingRef = useRef<number | null>(null);
@@ -35,7 +41,9 @@ export function EixoVerdeMap() {
   const mode = useAppStore((s) => s.mode);
   const showBikeLanes = useAppStore((s) => s.showBikeLanes);
   const showPois = useAppStore((s) => s.showPois);
+  const showStations = useAppStore((s) => s.showStations);
   const showHazards = useAppStore((s) => s.showHazards);
+  const showSafetySegments = useAppStore((s) => s.showSafetySegments);
   const candidates = useAppStore((s) => s.candidates);
   const selectedCandidateIdx = useAppStore((s) => s.selectedCandidateIdx);
   const isEditingWaypoints = useAppStore((s) => s.isEditingWaypoints);
@@ -53,7 +61,8 @@ export function EixoVerdeMap() {
 
   // Helper to attach EixoVerde vector sources & layers after every style load
   const attachOverlayLayers = (map: maplibregl.Map) => {
-    const isDark = useAppStore.getState().theme === 'dark';
+    const st = useAppStore.getState();
+    const isDark = st.theme === 'dark';
     const emptyFC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 
     if (!map.getSource(SRC_LANES)) {
@@ -68,11 +77,20 @@ export function EixoVerdeMap() {
         data: poisDataRef.current ?? emptyFC,
       });
     }
+    if (!map.getSource(SRC_STATIONS)) {
+      map.addSource(SRC_STATIONS, {
+        type: 'geojson',
+        data: stationsDataRef.current,
+      });
+    }
     if (!map.getSource(SRC_ALT_ROUTES)) {
       map.addSource(SRC_ALT_ROUTES, { type: 'geojson', data: emptyFC });
     }
     if (!map.getSource(SRC_ACTIVE_ROUTE)) {
       map.addSource(SRC_ACTIVE_ROUTE, { type: 'geojson', data: emptyFC });
+    }
+    if (!map.getSource(SRC_ROUTE_SAFETY)) {
+      map.addSource(SRC_ROUTE_SAFETY, { type: 'geojson', data: emptyFC });
     }
     if (!map.getSource(SRC_COMPLETED_ROUTE)) {
       map.addSource(SRC_COMPLETED_ROUTE, { type: 'geojson', data: emptyFC });
@@ -81,8 +99,9 @@ export function EixoVerdeMap() {
       map.addSource(SRC_RIDE_TRACK, { type: 'geojson', data: emptyFC });
     }
 
-    const laneVis = useAppStore.getState().showBikeLanes ? 'visible' : 'none';
-    const poiVis = useAppStore.getState().showPois ? 'visible' : 'none';
+    const laneVis = st.showBikeLanes ? 'visible' : 'none';
+    const poiVis = st.showPois ? 'visible' : 'none';
+    const stationVis = st.showStations ? 'visible' : 'none';
 
     // 1. Prohibited high-speed roads (subtle warning at zoom >= 13)
     if (!map.getLayer('ev-lanes-proibido')) {
@@ -165,13 +184,14 @@ export function EixoVerdeMap() {
       });
     }
 
-    // 4. Cycling POIs (racks, repair shops, stations)
+    // 4. Cycling POIs (racks & repair shops — stations render on dedicated Tembici/JET layer)
     if (!map.getLayer('ev-pois-circle')) {
       map.addLayer({
         id: 'ev-pois-circle',
         type: 'circle',
         source: SRC_POIS,
         minzoom: 12.8,
+        filter: ['!=', ['get', 'kind'], 'estacao'],
         layout: { visibility: poiVis },
         paint: {
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 12.8, 3.8, 16, 6.8],
@@ -180,8 +200,6 @@ export function EixoVerdeMap() {
             ['get', 'kind'],
             'oficina',
             '#f59e0b',
-            'estacao',
-            '#0284c7',
             '#10b981',
           ],
           'circle-stroke-width': 2,
@@ -190,7 +208,30 @@ export function EixoVerdeMap() {
       });
     }
 
-    // 5. Alternative route candidates (clickable like Waze / Google Maps)
+    // 4b. Dedicated Tembici (Bike Brasília) & JET Scooter Hubs layer
+    if (!map.getLayer('ev-stations-circle')) {
+      map.addLayer({
+        id: 'ev-stations-circle',
+        type: 'circle',
+        source: SRC_STATIONS,
+        minzoom: 11.4,
+        layout: { visibility: stationVis },
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 11.4, 4.5, 14, 7.2, 16.5, 9.5],
+          'circle-color': [
+            'match',
+            ['get', 'provider'],
+            'jet',
+            '#0284c7',
+            '#f97316',
+          ],
+          'circle-stroke-width': 2.2,
+          'circle-stroke-color': '#ffffff',
+        },
+      });
+    }
+
+    // 5. Alternative route candidates (clickable directly on map)
     if (!map.getLayer('ev-alt-routes-casing')) {
       map.addLayer({
         id: 'ev-alt-routes-casing',
@@ -218,7 +259,7 @@ export function EixoVerdeMap() {
       });
     }
 
-    // 6. Active selected route (bold Waze/Google Maps emerald-sky ribbon)
+    // 6. Active selected route (bold casing + emerald ribbon + color-coded safety segments)
     if (!map.getLayer('ev-active-route-casing')) {
       map.addLayer({
         id: 'ev-active-route-casing',
@@ -226,9 +267,9 @@ export function EixoVerdeMap() {
         source: SRC_ACTIVE_ROUTE,
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
-          'line-color': isDark ? '#022c22' : '#064e3b',
+          'line-color': isDark ? '#022c22' : '#0f172a',
           'line-width': 11,
-          'line-opacity': 0.92,
+          'line-opacity': 0.9,
         },
       });
     }
@@ -245,6 +286,29 @@ export function EixoVerdeMap() {
         },
       });
     }
+    if (!map.getLayer('ev-active-route-safety-line')) {
+      map.addLayer({
+        id: 'ev-active-route-safety-line',
+        type: 'line',
+        source: SRC_ROUTE_SAFETY,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': [
+            'match',
+            ['get', 'safetyClass'],
+            'ciclovia',
+            '#10b981',
+            'ciclofaixa',
+            '#0ea5e9',
+            'via_calma',
+            '#f59e0b',
+            '#f43f5e',
+          ],
+          'line-width': 6.8,
+          'line-opacity': 1,
+        },
+      });
+    }
 
     // 7. Completed portion during live navigation
     if (!map.getLayer('ev-completed-route-line')) {
@@ -255,8 +319,8 @@ export function EixoVerdeMap() {
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': isDark ? '#475569' : '#94a3b8',
-          'line-width': 6.5,
-          'line-opacity': 0.78,
+          'line-width': 6.8,
+          'line-opacity': 0.82,
         },
       });
     }
@@ -302,10 +366,12 @@ export function EixoVerdeMap() {
       activeRide: curActiveRide,
       rideSessions: curRides,
       replayingRideId: curReplayId,
+      showSafetySegments: safetyOn,
     } = state;
 
     const altSrc = map.getSource(SRC_ALT_ROUTES) as maplibregl.GeoJSONSource | undefined;
     const actSrc = map.getSource(SRC_ACTIVE_ROUTE) as maplibregl.GeoJSONSource | undefined;
+    const safetySrc = map.getSource(SRC_ROUTE_SAFETY) as maplibregl.GeoJSONSource | undefined;
     const compSrc = map.getSource(SRC_COMPLETED_ROUTE) as maplibregl.GeoJSONSource | undefined;
     const rideSrc = map.getSource(SRC_RIDE_TRACK) as maplibregl.GeoJSONSource | undefined;
     if (!altSrc || !actSrc || !compSrc) return;
@@ -356,6 +422,7 @@ export function EixoVerdeMap() {
     const active = curNav.isFreeRide ? undefined : cands[selIdx];
     if (!active || active.coords.length < 2) {
       actSrc.setData({ type: 'FeatureCollection', features: [] });
+      safetySrc?.setData({ type: 'FeatureCollection', features: [] });
       compSrc.setData({ type: 'FeatureCollection', features: [] });
       return;
     }
@@ -371,6 +438,15 @@ export function EixoVerdeMap() {
         },
       ],
     });
+
+    if (safetySrc) {
+      if (safetyOn) {
+        const segs = buildSafetyRouteSegments(active.coords, active.profile);
+        safetySrc.setData(segs.geojson);
+      } else {
+        safetySrc.setData({ type: 'FeatureCollection', features: [] });
+      }
+    }
 
     // Split completed segment when navigating
     if (curMode === 'navigate' && curNav.distanceAlongM > 15) {
@@ -430,15 +506,23 @@ export function EixoVerdeMap() {
           buildLaneSpatialIndex(lanes);
           const src = map.getSource(SRC_LANES) as maplibregl.GeoJSONSource | undefined;
           src?.setData(lanes);
+          // Refresh color-coded safety segments once the DF spatial index is populated
+          syncRoutesToMap(map);
         }
         if (pois) {
           poisDataRef.current = pois;
           const src = map.getSource(SRC_POIS) as maplibregl.GeoJSONSource | undefined;
           src?.setData(pois);
+
+          // Merge all 38 real Bike Brasília / Tembici stations with curated JET hubs
+          const mergedStations = buildMobilityStationsCollection(pois);
+          stationsDataRef.current = mergedStations.geojson;
+          const stationSrc = map.getSource(SRC_STATIONS) as maplibregl.GeoJSONSource | undefined;
+          stationSrc?.setData(mergedStations.geojson);
         }
       })
       .catch(() => {
-        // Offline or missing static files — map still works cleanly
+        // Offline or missing static files — map & curated JET hubs still work cleanly
       });
 
     // Click alternative route directly on map to select it
@@ -449,22 +533,87 @@ export function EixoVerdeMap() {
       }
     });
 
-    // Click POI circle to show crisp popup
+    // Click Tembici / JET station circle to show XSS-safe DOM popup with 1-tap routing CTA
+    map.on('click', 'ev-stations-circle', (e) => {
+      const feat = e.features?.[0];
+      if (!feat || feat.geometry.type !== 'Point') return;
+      const props = feat.properties as {
+        id?: string;
+        provider?: 'tembici' | 'jet';
+        name?: string;
+        subtitle?: string;
+        capacityHint?: string;
+      };
+      const coords = feat.geometry.coordinates as LngLat;
+      const isJet = props.provider === 'jet';
+
+      const root = document.createElement('div');
+      root.style.cssText = 'font-family:Inter,sans-serif;min-width:190px;padding:2px 0';
+
+      const badgeEl = document.createElement('div');
+      badgeEl.style.cssText = `font-size:10px;font-weight:800;text-transform:uppercase;color:${isJet ? '#0284c7' : '#ea580c'};margin-bottom:2px`;
+      badgeEl.textContent = isJet ? '⚡ Hub Patinete JET' : '🚲 Bike Brasília (Tembici)';
+      root.appendChild(badgeEl);
+
+      const titleEl = document.createElement('div');
+      titleEl.style.cssText = 'font-size:13px;font-weight:700;color:#0f172a';
+      titleEl.textContent = props.name || 'Estação de Mobilidade';
+      root.appendChild(titleEl);
+
+      if (props.subtitle || props.capacityHint) {
+        const subEl = document.createElement('div');
+        subEl.style.cssText = 'font-size:11px;color:#475569;margin-top:2px';
+        subEl.textContent = [props.subtitle, props.capacityHint].filter(Boolean).join(' • ');
+        root.appendChild(subEl);
+      }
+
+      const routeBtn = document.createElement('button');
+      routeBtn.type = 'button';
+      routeBtn.style.cssText =
+        'margin-top:8px;width:100%;background:#059669;color:#fff;border:none;border-radius:10px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer';
+      routeBtn.textContent = 'Ir até esta estação';
+
+      const popup = new maplibregl.Popup({ closeButton: true, maxWidth: '250px', offset: 14 })
+        .setLngLat(coords)
+        .setDOMContent(root)
+        .addTo(map);
+
+      routeBtn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        popup.remove();
+        void useAppStore.getState().setDestination(
+          {
+            id: props.id || `station-${Date.now()}`,
+            name: props.name || 'Estação de Mobilidade',
+            subtitle: props.subtitle || 'Brasília, DF',
+            coords,
+            source: 'curated',
+          },
+          true
+        );
+      });
+      root.appendChild(routeBtn);
+    });
+
+    // Click POI circle to show crisp XSS-safe DOM popup
     map.on('click', 'ev-pois-circle', (e) => {
       const feat = e.features?.[0];
       if (!feat || feat.geometry.type !== 'Point') return;
       const props = feat.properties as { name?: string; label?: string; kind?: string };
       const coords = feat.geometry.coordinates as LngLat;
-      const badge =
-        props.kind === 'oficina' ? '🔧 Oficina / Loja' : props.kind === 'estacao' ? '🚲 Estação' : '🅿️ Bicicletário';
+      const root = document.createElement('div');
+      root.style.cssText = 'font-family:Inter,sans-serif;padding:2px 0';
+      const badgeEl = document.createElement('div');
+      badgeEl.style.cssText = 'font-size:11px;font-weight:700;color:#059669;margin-bottom:2px';
+      badgeEl.textContent = props.kind === 'oficina' ? '🔧 Oficina / Loja' : '🅿️ Bicicletário';
+      const titleEl = document.createElement('div');
+      titleEl.style.cssText = 'font-size:13px;font-weight:600;color:#0f172a';
+      titleEl.textContent = props.name || props.label || 'Ponto Cicloviário';
+      root.appendChild(badgeEl);
+      root.appendChild(titleEl);
       new maplibregl.Popup({ closeButton: true, maxWidth: '240px', offset: 12 })
         .setLngLat(coords)
-        .setHTML(
-          `<div style="font-family:Inter,sans-serif;padding:2px 0">
-             <div style="font-size:11px;font-weight:700;color:#059669;margin-bottom:2px">${badge}</div>
-             <div style="font-size:13px;font-weight:600;color:#0f172a">${props.name || props.label || 'Ponto Cicloviário'}</div>
-           </div>`
-        )
+        .setDOMContent(root)
         .addTo(map);
     });
 
@@ -475,14 +624,19 @@ export function EixoVerdeMap() {
       const feat = e.features?.[0];
       if (!feat) return;
       const props = feat.properties as { name?: string; label?: string; kind?: string };
+      const root = document.createElement('div');
+      root.style.cssText = 'font-family:Inter,sans-serif;padding:2px 0';
+      const badgeEl = document.createElement('div');
+      badgeEl.style.cssText = `font-size:11px;font-weight:700;color:${props.kind === 'ciclofaixa' ? '#0284c7' : '#059669'}`;
+      badgeEl.textContent = props.label || 'Ciclovia';
+      const titleEl = document.createElement('div');
+      titleEl.style.cssText = 'font-size:12px;font-weight:600;color:#0f172a';
+      titleEl.textContent = props.name || 'Malha Cicloviária DF';
+      root.appendChild(badgeEl);
+      root.appendChild(titleEl);
       new maplibregl.Popup({ closeButton: false, maxWidth: '230px', offset: 10 })
         .setLngLat(e.lngLat)
-        .setHTML(
-          `<div style="font-family:Inter,sans-serif;padding:2px 0">
-             <div style="font-size:11px;font-weight:700;color:${props.kind === 'ciclofaixa' ? '#0284c7' : '#059669'}">${props.label || 'Ciclovia'}</div>
-             <div style="font-size:12px;font-weight:600;color:#0f172a">${props.name || 'Malha Cicloviária DF'}</div>
-           </div>`
-        )
+        .setDOMContent(root)
         .addTo(map);
     });
 
@@ -498,7 +652,7 @@ export function EixoVerdeMap() {
       }
     });
 
-    // Desktop right-click -> open Waze-style quick place popup
+    // Desktop right-click -> open pin-anchored quick place popup
     map.on('contextmenu', (e) => {
       const st = useAppStore.getState();
       if (st.mode === 'navigate') return;
@@ -577,7 +731,7 @@ export function EixoVerdeMap() {
     map.on('zoomstart', cancelLongPress);
 
     // Hover cursor feedback
-    ['ev-alt-routes-line', 'ev-pois-circle', 'ev-lanes-dedicated'].forEach((layerId) => {
+    ['ev-alt-routes-line', 'ev-pois-circle', 'ev-stations-circle', 'ev-lanes-dedicated'].forEach((layerId) => {
       map.on('mouseenter', layerId, () => {
         map.getCanvas().style.cursor = 'pointer';
       });
@@ -616,7 +770,7 @@ export function EixoVerdeMap() {
     map.getCanvas().style.cursor = mapPickTarget || isEditingWaypoints ? 'crosshair' : '';
   }, [mapPickTarget, isEditingWaypoints]);
 
-  // Toggle bike lanes / POIs visibility
+  // Toggle bike lanes / POIs / Stations visibility
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !styleReadyRef.current) return;
@@ -627,13 +781,26 @@ export function EixoVerdeMap() {
     if (map.getLayer('ev-pois-circle')) {
       map.setLayoutProperty('ev-pois-circle', 'visibility', showPois ? 'visible' : 'none');
     }
-  }, [showBikeLanes, showPois]);
+    if (map.getLayer('ev-stations-circle')) {
+      map.setLayoutProperty('ev-stations-circle', 'visibility', showStations ? 'visible' : 'none');
+    }
+  }, [showBikeLanes, showPois, showStations]);
 
-  // Sync routes & ride replay/breadcrumb whenever state updates
+  // Sync routes, safety segments & ride replay/breadcrumb whenever state updates
   useEffect(() => {
     const map = mapRef.current;
     if (map) syncRoutesToMap(map);
-  }, [candidates, selectedCandidateIdx, mode, nav.distanceAlongM, nav.isFreeRide, activeRide?.track.length, replayingRideId, rideSessions]);
+  }, [
+    candidates,
+    selectedCandidateIdx,
+    mode,
+    showSafetySegments,
+    nav.distanceAlongM,
+    nav.isFreeRide,
+    activeRide?.track.length,
+    replayingRideId,
+    rideSessions,
+  ]);
 
   // Fit bounds & render Start/Finish pins when replaying a ride from Meus Pedais
   useEffect(() => {
@@ -741,9 +908,21 @@ export function EixoVerdeMap() {
       waypointMarkersRef.current.push(marker);
     });
 
-    // Arterial crossing danger pills
+    // Arterial crossing danger pills — stagger closely-spaced crossings (e.g. L2N / EIXÃO N / W3N) so none overlap
+    const placedCrossings: Array<{ coords: LngLat; offsetY: number }> = [];
     active.crossings.forEach((c) => {
+      let offsetY = 0;
+      const closeCount = placedCrossings.filter(
+        (prev) =>
+          Math.abs(prev.coords[0] - c.coords[0]) < 0.009 && Math.abs(prev.coords[1] - c.coords[1]) < 0.009
+      ).length;
+      if (closeCount === 1) offsetY = -22;
+      else if (closeCount === 2) offsetY = 22;
+      else if (closeCount >= 3) offsetY = closeCount % 2 === 0 ? -36 : 36;
+      placedCrossings.push({ coords: c.coords, offsetY });
+
       const el = document.createElement('div');
+      el.setAttribute('data-crossing-tag', c.shortTag);
       el.innerHTML = `<div style="background:${c.danger === 'alta' ? '#dc2626' : '#d97706'};color:#fff;font-size:10px;font-weight:800;padding:2px 7px;border-radius:999px;border:2px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,0.3);white-space:nowrap;cursor:pointer">⚠ ${c.shortTag}</div>`;
       const popup = new maplibregl.Popup({ offset: 14, maxWidth: '240px' }).setHTML(
         `<div style="font-family:Inter,sans-serif">
@@ -752,7 +931,10 @@ export function EixoVerdeMap() {
            <div style="font-size:12px;color:#475569;line-height:1.35">${c.note}</div>
          </div>`
       );
-      const marker = new maplibregl.Marker({ element: el }).setLngLat(c.coords).setPopup(popup).addTo(map);
+      const marker = new maplibregl.Marker({ element: el, offset: [0, offsetY] })
+        .setLngLat(c.coords)
+        .setPopup(popup)
+        .addTo(map);
       crossingMarkersRef.current.push(marker);
     });
   }, [candidates, selectedCandidateIdx, isEditingWaypoints, mode]);
@@ -903,7 +1085,7 @@ export function EixoVerdeMap() {
     }
   }, [hoverCoordIndex, candidates, selectedCandidateIdx]);
 
-  // Long-press / Right-click dropped target pin marker
+  // Long-press / Right-click dropped target pin marker + smooth centering + live screen projection for callout bubble
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -911,11 +1093,14 @@ export function EixoVerdeMap() {
     if (!mapContextPin || mode === 'navigate') {
       contextPinMarkerRef.current?.remove();
       contextPinMarkerRef.current = null;
+      lastCenteredContextKeyRef.current = null;
+      useAppStore.getState().setMapContextScreenPos(null);
       return;
     }
 
     if (!contextPinMarkerRef.current) {
       const el = document.createElement('div');
+      el.id = 'eixoverde-context-pin-marker';
       el.className = 'relative flex items-center justify-center';
       el.innerHTML = `
         <div class="gps-pulse-ring" style="position:absolute;width:36px;height:36px;border-radius:999px;background:rgba(244,63,94,0.32)"></div>
@@ -929,6 +1114,41 @@ export function EixoVerdeMap() {
     } else {
       contextPinMarkerRef.current.setLngLat(mapContextPin.coords);
     }
+
+    const syncProjectedPos = () => {
+      const pt = map.project(mapContextPin.coords);
+      const rect = map.getContainer().getBoundingClientRect();
+      useAppStore.getState().setMapContextScreenPos({
+        x: rect.left + pt.x,
+        y: rect.top + pt.y,
+      });
+    };
+
+    syncProjectedPos();
+
+    // Smoothly center the map onto the marked pin with sidebar/bottom-sheet padding so the callout sits cleanly above it
+    const coordKey = `${mapContextPin.coords[0]},${mapContextPin.coords[1]}`;
+    if (lastCenteredContextKeyRef.current !== coordKey) {
+      lastCenteredContextKeyRef.current = coordKey;
+      const isDesktop = window.innerWidth >= 1024;
+      map.easeTo({
+        center: mapContextPin.coords,
+        padding: isDesktop
+          ? { top: 155, bottom: 40, left: 430, right: 64 }
+          : { top: 195, bottom: Math.round(window.innerHeight * 0.48), left: 20, right: 20 },
+        duration: 420,
+      });
+    }
+
+    map.on('move', syncProjectedPos);
+    map.on('zoom', syncProjectedPos);
+    map.on('resize', syncProjectedPos);
+
+    return () => {
+      map.off('move', syncProjectedPos);
+      map.off('zoom', syncProjectedPos);
+      map.off('resize', syncProjectedPos);
+    };
   }, [mapContextPin, mode]);
 
   // Live GPS / Demo Navigation Puck & Silky Camera Follow

@@ -21,12 +21,14 @@ Siga este guia rápido (cerca de 5 minutos) para ativar **Contas na Nuvem**, **S
 2. Copie todo o conteúdo do arquivo [`supabase/migrations/20261121000001_eixoverde_phase2.sql`](../supabase/migrations/20261121000001_eixoverde_phase2.sql) e cole no editor.
 3. Clique em **Run**.
 4. *(Fase 3 — Histórico de Pedais na Nuvem)* Repita os passos 1–3 com o arquivo [`supabase/migrations/20261121000002_eixoverde_phase3_rides.sql`](../supabase/migrations/20261121000002_eixoverde_phase3_rides.sql) para sincronizar o histórico **Meus Pedais** (`ride_sessions` com PostGIS `LineString` + RLS privado). Caso ainda não tenha rodado esta migração, o app salva seus pedais normalmente em IndexedDB e sincroniza automaticamente assim que a tabela existir.
+5. *(Fase 4 — Comunidade DF, Avaliações 1–5★ & Alertas Realtime)* Repita os passos 1–3 com o arquivo [`supabase/migrations/20261121000003_eixoverde_phase4_community.sql`](../supabase/migrations/20261121000003_eixoverde_phase4_community.sql) para habilitar **Rotas da Comunidade DF** (`community_routes` com PostGIS `LineString` + leitura pública / escrita do autor), **Avaliações 1–5★ com tags de segurança** (`route_ratings` + trigger de média automática) e **Supabase Realtime** em `hazard_reports`.
 
 O script é **100% idempotente** (pode ser executado novamente sem erro) e cria automaticamente:
 - Extensão **PostGIS** no schema `extensions` (compatível com Supabase Cloud).
-- Tabelas com **Row Level Security (RLS)** habilitado: `profiles`, `saved_routes`, `saved_places`, `custom_vehicles`, `hazard_reports`, `hazard_confirmations`, `ride_sessions` e `user_preferences`.
-- Triggers automáticos de geometria (`LineString` e `Point` SRID 4326), contagem de confirmações de alertas e criação de perfil no cadastro.
+- Tabelas com **Row Level Security (RLS)** habilitado: `profiles`, `saved_routes`, `saved_places`, `custom_vehicles`, `hazard_reports`, `hazard_confirmations`, `ride_sessions`, `community_routes`, `route_ratings` e `user_preferences`.
+- Triggers automáticos de geometria (`LineString` e `Point` SRID 4326), contagem de confirmações de alertas, média de avaliações da comunidade e criação de perfil no cadastro.
 - Funções espaciais RPC `get_hazards_in_bounds(...)` (com índice GIST) e `confirm_hazard(...)`.
+- Publicação `supabase_realtime` para atualizações ao vivo de `hazard_reports`.
 
 ---
 

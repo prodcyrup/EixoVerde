@@ -271,6 +271,60 @@ export interface RideSession {
   updatedAt: string;
 }
 
+// === Phase 4: Community Routes, Ratings, Mobility Stations & Offline Cache ===
+
+export type RouteSafetyTag =
+  | 'bom_asfalto'
+  | 'iluminada'
+  | 'sombra'
+  | 'cruzamento_tenso'
+  | 'muito_movimento'
+  | 'paisagem';
+
+export interface RouteRatingRecord {
+  routeId: string;
+  rating: number; // 1..5
+  tags: RouteSafetyTag[];
+  updatedAt: string;
+}
+
+export interface RouteRatingAggregate {
+  routeId: string;
+  avgRating: number;
+  ratingCount: number;
+  topTags: RouteSafetyTag[];
+  userRating?: number;
+  userTags?: RouteSafetyTag[];
+}
+
+export interface CommunityRoute extends SavedRoute {
+  authorId?: string;
+  authorName: string;
+  avgRating: number;
+  ratingCount: number;
+  safetyTags: RouteSafetyTag[];
+  isCommunity: true;
+}
+
+export type MobilityProvider = 'tembici' | 'jet';
+
+export interface MobilityStation {
+  id: string;
+  provider: MobilityProvider;
+  name: string;
+  subtitle: string;
+  coords: LngLat;
+  capacityHint?: string;
+}
+
+export interface OfflineCacheStatus {
+  ready: boolean;
+  lanesCached: boolean;
+  poisCached: boolean;
+  cachedCount: number;
+  lastUpdatedAt: string | null;
+}
+
 export interface UserPreferences {
   theme: ThemeMode;
   basemap: MapBasemapMode;
@@ -280,7 +334,9 @@ export interface UserPreferences {
   voiceMode: VoiceMode;
   showBikeLanes: boolean;
   showPois: boolean;
+  showStations?: boolean;
   showHazards: boolean;
+  showSafetySegments?: boolean;
   homePlace?: PlaceResult;
   workPlace?: PlaceResult;
   batteryCalibrations?: Record<string, VehicleBatteryCalibration>;

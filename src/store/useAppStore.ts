@@ -10,6 +10,7 @@ import {
   subscribeAuthChanges,
   updatePassword,
 } from '../cloud/authService';
+import { subscribeRealtimeHazards } from '../cloud/realtimeHazards';
 import { BRAND } from '../config/brand';
 import { hasSupabaseConfig } from '../config/providers';
 import { CURATED_DF_ROUTES } from '../data/curatedRoutes';
@@ -22,6 +23,7 @@ import {
 } from '../engine/geo';
 import { decodeShareableRouteFromUrl } from '../engine/gpx';
 import { extractRouteManeuvers } from '../engine/navigation';
+import { checkOfflineDfCacheStatus, warmOfflineDfCache } from '../engine/offlineCache';
 import {
   type ActiveRideRecording,
   appendRideSample,
@@ -32,19 +34,25 @@ import {
 import { planMultiProfileRoutes, reverseGeocode } from '../engine/routing';
 import { computeUpdatedBatteryCalibration } from '../engine/telemetry';
 import { fetchLiveWeather } from '../engine/weather';
+import { indexedDbStorage } from '../storage/indexedDbAdapter';
 import { repository } from '../storage/repository';
+import { supabaseAdapter } from '../storage/supabaseAdapter';
 import { syncEngine } from '../storage/syncEngine';
 import type {
   AppMode,
   AuthUser,
+  CommunityRoute,
   HazardKind,
   HazardReport,
   LngLat,
   LocalMigrationSummary,
   MapBasemapMode,
+  OfflineCacheStatus,
   PlaceResult,
   RideSession,
   RouteCandidate,
+  RouteRatingAggregate,
+  RouteSafetyTag,
   SavedPlace,
   SavedPlaceCategory,
   SavedRoute,
@@ -56,6 +64,8 @@ import type {
   VoiceMode,
   WeatherSnapshot,
 } from '../types';
+
+let unsubscribeRealtimeHazards: (() => void) | null = null;
 
 export type MapPickTarget =
   | null
@@ -98,7 +108,9 @@ export interface AppStore {
   voiceMode: VoiceMode;
   showBikeLanes: boolean;
   showPois: boolean;
+  showStations: boolean;
   showHazards: boolean;
+  showSafetySegments: boolean;
 
   // Phase 2: Cloud Auth & Offline-First Sync State
   cloudConfigured: boolean;
@@ -131,6 +143,13 @@ export interface AppStore {
   pendingRideSummary: RideSession | null;
   replayingRideId: string | null;
 
+  // Phase 4: Community DF, Route Ratings, Realtime & Offline DF Cache
+  communityRoutes: CommunityRoute[];
+  routeRatings: Record<string, RouteRatingAggregate>;
+  offlineCache: OfflineCacheStatus;
+  offlineCacheLoading: boolean;
+  realtimeConnected: boolean;
+
   // Planner & Active Route
   origin: PlaceResult | null;
   destination: PlaceResult | null;
@@ -162,6 +181,7 @@ export interface AppStore {
   pendingHazardCoords: LngLat | null;
   pendingSavePlace: { place: PlaceResult; defaultCategory: SavedPlaceCategory } | null;
   mapContextPin: { coords: LngLat; place: PlaceResult | null; loading: boolean } | null;
+  mapContextScreenPos: { x: number; y: number } | null;
   toasts: ToastMessage[];
 
   // Actions
@@ -201,13 +221,23 @@ export interface AppStore {
   setReplayingRideId: (id: string | null) => void;
   resetVehicleCalibration: (vehicleId: string) => void;
 
+  // Phase 4: Community DF, Ratings, Safety Segments, Offline Cache & Pin Anchor
+  toggleSafetySegments: () => void;
+  setMapContextScreenPos: (pos: { x: number; y: number } | null) => void;
+  loadCommunityData: () => Promise<void>;
+  rateRoute: (routeId: string, rating: number, tags: RouteSafetyTag[]) => Promise<void>;
+  publishSavedRouteToCommunity: (routeId: string) => Promise<void>;
+  deleteCommunityRoute: (routeId: string) => Promise<void>;
+  refreshOfflineCache: () => Promise<void>;
+  warmOfflineCache: () => Promise<void>;
+
   locateCurrentPosition: (options?: { silent?: boolean; flyToUser?: boolean }) => Promise<PlaceResult | null>;
   useCurrentLocationAsOrigin: () => Promise<void>;
   setMode: (mode: AppMode) => void;
   toggleTheme: () => void;
   toggleBasemap: () => void;
   cycleVoiceMode: () => void;
-  toggleLayer: (layer: 'lanes' | 'pois' | 'hazards') => void;
+  toggleLayer: (layer: 'lanes' | 'pois' | 'stations' | 'hazards') => void;
   setExploreTab: (tab: 'routes' | 'places' | 'rides') => void;
 
   // Vehicle actions
@@ -323,7 +353,9 @@ function persistPrefs(state: AppStore): void {
     voiceMode: state.voiceMode,
     showBikeLanes: state.showBikeLanes,
     showPois: state.showPois,
+    showStations: state.showStations,
     showHazards: state.showHazards,
+    showSafetySegments: state.showSafetySegments,
     homePlace: state.homePlace,
     workPlace: state.workPlace,
     batteryCalibrations: state.batteryCalibrations,
@@ -339,7 +371,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
   voiceMode: 'voice', // Audio-first handlebar mode ON by default
   showBikeLanes: true,
   showPois: true,
+  showStations: true,
   showHazards: true,
+  showSafetySegments: true,
 
   cloudConfigured: hasSupabaseConfig(),
   authUser: null,
@@ -366,6 +400,18 @@ export const useAppStore = create<AppStore>((set, get) => ({
   activeRide: null,
   pendingRideSummary: null,
   replayingRideId: null,
+
+  communityRoutes: [],
+  routeRatings: {},
+  offlineCache: {
+    ready: false,
+    lanesCached: false,
+    poisCached: false,
+    cachedCount: 0,
+    lastUpdatedAt: null,
+  },
+  offlineCacheLoading: false,
+  realtimeConnected: false,
 
   origin: null,
   destination: null,
@@ -408,16 +454,18 @@ export const useAppStore = create<AppStore>((set, get) => ({
   pendingHazardCoords: null,
   pendingSavePlace: null,
   mapContextPin: null,
+  mapContextScreenPos: null,
   toasts: [],
 
   async hydrateFromStorage() {
-    const [prefs, userRoutes, savedPlaces, customVehicles, hazards, rideSessions] = await Promise.all([
+    const [prefs, userRoutes, savedPlaces, customVehicles, hazards, rideSessions, localRatings] = await Promise.all([
       repository.getPreferences(),
       repository.getSavedRoutes(),
       repository.getSavedPlaces(),
       repository.getCustomVehicles(),
       repository.getHazards(),
       repository.getRideSessions(),
+      indexedDbStorage.getRouteRatings(),
     ]);
 
     const theme: ThemeMode = prefs.theme ?? get().theme ?? 'light';
@@ -431,6 +479,28 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const homeSaved = savedPlaces.find((p) => p.category === 'home');
     const workSaved = savedPlaces.find((p) => p.category === 'work');
 
+    // Merge locally saved route ratings into routeRatings map
+    const mergedRatings: Record<string, RouteRatingAggregate> = { ...get().routeRatings };
+    for (const r of localRatings) {
+      const prev = mergedRatings[r.routeId];
+      if (!prev) {
+        mergedRatings[r.routeId] = {
+          routeId: r.routeId,
+          avgRating: r.rating,
+          ratingCount: 1,
+          topTags: r.tags.slice(0, 3),
+          userRating: r.rating,
+          userTags: r.tags,
+        };
+      } else {
+        mergedRatings[r.routeId] = {
+          ...prev,
+          userRating: prev.userRating ?? r.rating,
+          userTags: prev.userTags ?? r.tags,
+        };
+      }
+    }
+
     set({
       theme,
       basemap: prefs.basemap ?? get().basemap ?? 'standard',
@@ -440,7 +510,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
       voiceMode: prefs.voiceMode ?? get().voiceMode ?? 'voice',
       showBikeLanes: prefs.showBikeLanes ?? true,
       showPois: prefs.showPois ?? true,
+      showStations: prefs.showStations ?? true,
       showHazards: prefs.showHazards ?? true,
+      showSafetySegments: prefs.showSafetySegments ?? true,
       homePlace: homeSaved
         ? { id: homeSaved.id, name: homeSaved.label, subtitle: homeSaved.address, coords: homeSaved.coords, source: 'curated' }
         : prefs.homePlace,
@@ -453,6 +525,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       savedPlaces,
       hazards,
       rideSessions,
+      routeRatings: mergedRatings,
     });
   },
 
@@ -481,9 +554,39 @@ export const useAppStore = create<AppStore>((set, get) => ({
       return;
     }
 
+    // Subscribe to Supabase Realtime live community hazard updates
+    if (unsubscribeRealtimeHazards) {
+      unsubscribeRealtimeHazards();
+      unsubscribeRealtimeHazards = null;
+    }
+    unsubscribeRealtimeHazards = subscribeRealtimeHazards(
+      (ev) => {
+        if (ev.eventType === 'DELETE' && ev.deletedId) {
+          void indexedDbStorage.deleteHazard(ev.deletedId);
+          set((s) => ({
+            hazards: s.hazards.filter((h) => h.id !== ev.deletedId),
+          }));
+          return;
+        }
+        if (ev.hazard) {
+          const incoming = ev.hazard;
+          void indexedDbStorage.saveHazard(incoming);
+          set((s) => {
+            const exists = s.hazards.some((h) => h.id === incoming.id);
+            const next = exists
+              ? s.hazards.map((h) => (h.id === incoming.id ? { ...h, ...incoming } : h))
+              : [incoming, ...s.hazards];
+            return { hazards: next };
+          });
+        }
+      },
+      (connected) => set({ realtimeConnected: connected })
+    );
+
     const { user } = await getCurrentSession();
     set({ authUser: user });
     await syncEngine.initialize(user?.id ?? null);
+    void get().loadCommunityData();
 
     if (user) {
       const alreadyMigrated = await syncEngine.hasCompletedInitialMigration(user.id);
@@ -510,6 +613,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         const prevId = get().authUser?.id;
         set({ authUser: nextUser });
         void syncEngine.setAuthenticatedUser(nextUser.id);
+        void get().loadCommunityData();
         if (prevId !== nextUser.id) {
           void (async () => {
             const alreadyMigrated = await syncEngine.hasCompletedInitialMigration(nextUser.id);
@@ -680,6 +784,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({ initialized: true });
     void get().initAuthAndSync();
     void get().refreshWeather(BRAND.defaultCenter);
+    void get().refreshOfflineCache();
 
     // Check if opened from a shared route link (?share=...)
     const shared = decodeShareableRouteFromUrl();
@@ -970,8 +1075,173 @@ export const useAppStore = create<AppStore>((set, get) => ({
   toggleLayer(layer) {
     if (layer === 'lanes') set((s) => ({ showBikeLanes: !s.showBikeLanes }));
     if (layer === 'pois') set((s) => ({ showPois: !s.showPois }));
+    if (layer === 'stations') set((s) => ({ showStations: !s.showStations }));
     if (layer === 'hazards') set((s) => ({ showHazards: !s.showHazards }));
     persistPrefs(get());
+  },
+
+  toggleSafetySegments() {
+    set((s) => ({ showSafetySegments: !s.showSafetySegments }));
+    persistPrefs(get());
+  },
+
+  setMapContextScreenPos(pos) {
+    set({ mapContextScreenPos: pos });
+  },
+
+  async loadCommunityData() {
+    if (!hasSupabaseConfig()) return;
+    try {
+      const userId = get().authUser?.id ?? null;
+      const [cloudRoutes, cloudRatings] = await Promise.all([
+        supabaseAdapter.pullCommunityRoutes(),
+        supabaseAdapter.pullRouteRatings(userId),
+      ]);
+      const localRatings = await indexedDbStorage.getRouteRatings();
+      const mergedRatings: Record<string, RouteRatingAggregate> = { ...cloudRatings };
+      for (const local of localRatings) {
+        const existing = mergedRatings[local.routeId];
+        if (!existing) {
+          mergedRatings[local.routeId] = {
+            routeId: local.routeId,
+            avgRating: local.rating,
+            ratingCount: 1,
+            topTags: local.tags.slice(0, 3),
+            userRating: local.rating,
+            userTags: local.tags,
+          };
+        } else if (!existing.userRating) {
+          mergedRatings[local.routeId] = {
+            ...existing,
+            userRating: local.rating,
+            userTags: local.tags,
+          };
+        }
+      }
+      set({ communityRoutes: cloudRoutes, routeRatings: mergedRatings });
+    } catch {
+      // Non-fatal offline or missing-table fallback
+    }
+  },
+
+  async rateRoute(routeId, rating, tags) {
+    const cleanRating = Math.max(1, Math.min(5, Math.round(rating)));
+    const now = new Date().toISOString();
+    await indexedDbStorage.saveRouteRating({
+      routeId,
+      rating: cleanRating,
+      tags,
+      updatedAt: now,
+    });
+
+    // Optimistically update local aggregate immediately
+    set((s) => {
+      const prev = s.routeRatings[routeId];
+      const hadUserRating = typeof prev?.userRating === 'number';
+      const nextCount = prev ? (hadUserRating ? prev.ratingCount : prev.ratingCount + 1) : 1;
+      const prevSum = prev ? prev.avgRating * prev.ratingCount : 0;
+      const adjustedSum = hadUserRating && prev ? prevSum - (prev.userRating ?? 0) + cleanRating : prevSum + cleanRating;
+      const nextAvg = nextCount > 0 ? +(adjustedSum / nextCount).toFixed(1) : cleanRating;
+      const topTags = tags.length > 0 ? tags.slice(0, 3) : (prev?.topTags ?? []);
+      return {
+        routeRatings: {
+          ...s.routeRatings,
+          [routeId]: {
+            routeId,
+            avgRating: nextAvg,
+            ratingCount: nextCount,
+            topTags,
+            userRating: cleanRating,
+            userTags: tags,
+          },
+        },
+        communityRoutes: s.communityRoutes.map((cr) =>
+          cr.id === routeId ? { ...cr, avgRating: nextAvg, ratingCount: nextCount } : cr
+        ),
+      };
+    });
+
+    const user = get().authUser;
+    let syncedCloud = false;
+    if (user && hasSupabaseConfig()) {
+      try {
+        syncedCloud = await supabaseAdapter.upsertRouteRating(user.id, routeId, cleanRating, tags);
+        if (syncedCloud) {
+          void get().loadCommunityData();
+        }
+      } catch {
+        // Already saved in IndexedDB
+      }
+    }
+
+    get().pushToast(
+      `Avaliação salva (${cleanRating}★)`,
+      syncedCloud ? 'Sincronizada com a comunidade EixoVerde.' : 'Salva localmente neste dispositivo.',
+      'emerald'
+    );
+  },
+
+  async publishSavedRouteToCommunity(routeId) {
+    const user = get().authUser;
+    if (!user) {
+      set({ authModalOpen: true });
+      get().pushToast('Entre para publicar na Comunidade DF', 'Sua conta gratuita permite compartilhar rotas.', 'amber');
+      return;
+    }
+    const route = get().savedRoutes.find((r) => r.id === routeId);
+    if (!route) return;
+    const authorName = user.displayName || user.email.split('@')[0] || 'Ciclista DF';
+    try {
+      const published = await supabaseAdapter.publishCommunityRoute(user.id, route, authorName);
+      if (!published) {
+        get().pushToast(
+          'Comunidade DF indisponível',
+          'Verifique se a migração SQL da Fase 4 foi aplicada no Supabase.',
+          'amber'
+        );
+        return;
+      }
+      set((s) => ({
+        communityRoutes: [published, ...s.communityRoutes.filter((r) => r.id !== published.id)],
+      }));
+      get().pushToast('Rota publicada na Comunidade DF!', published.name, 'emerald');
+    } catch {
+      get().pushToast('Falha ao publicar rota', 'Tente novamente quando a conexão estabilizar.', 'rose');
+    }
+  },
+
+  async deleteCommunityRoute(routeId) {
+    const user = get().authUser;
+    if (!user) return;
+    try {
+      await supabaseAdapter.deleteCommunityRoute(user.id, routeId);
+      set((s) => ({
+        communityRoutes: s.communityRoutes.filter((r) => r.id !== routeId),
+      }));
+      get().pushToast('Rota removida da Comunidade DF', undefined, 'slate');
+    } catch {
+      get().pushToast('Não foi possível remover', 'Tente novamente em instantes.', 'rose');
+    }
+  },
+
+  async refreshOfflineCache() {
+    const status = await checkOfflineDfCacheStatus(import.meta.env.BASE_URL);
+    set({ offlineCache: status });
+  },
+
+  async warmOfflineCache() {
+    set({ offlineCacheLoading: true });
+    const status = await warmOfflineDfCache(import.meta.env.BASE_URL);
+    set({ offlineCache: status, offlineCacheLoading: false });
+    if (status.ready) {
+      get().pushToast(
+        'Cache Offline DF pronto!',
+        'Ciclovias, estações e POIs de Brasília salvos neste dispositivo.',
+        'emerald'
+      );
+    } else {
+      get().pushToast('Cache parcialmente atualizado', 'Conecte-se à internet para baixar todos os dados do DF.', 'amber');
+    }
   },
 
   setExploreTab(tab) {
@@ -1138,7 +1408,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   closeMapContextPin() {
-    set({ mapContextPin: null });
+    set({ mapContextPin: null, mapContextScreenPos: null });
   },
 
   async recalculateRoute(customWaypoints) {

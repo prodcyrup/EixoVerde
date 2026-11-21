@@ -203,6 +203,20 @@ def run_e2e() -> int:
             )
             check("Desktop header zero clipping", all(not b["overflow"] for b in header_check["btns"]))
 
+            # Single-mount shell: zero duplicate DOM IDs
+            dup_ids_desktop = page.evaluate(
+                """() => ({
+                  search: document.querySelectorAll('#eixoverde-search-input').length,
+                  freeride: document.querySelectorAll('#eixoverde-freeride-chip').length,
+                  garage: document.querySelectorAll('#eixoverde-garage-btn').length,
+                })"""
+            )
+            check(
+                "Desktop single-mount shell has zero duplicate DOM IDs",
+                dup_ids_desktop == {"search": 1, "freeride": 1, "garage": 1},
+                json.dumps(dup_ids_desktop),
+            )
+
             light_search = page.locator("aside #eixoverde-search-input")
             light_search.click()
             light_search.fill("Parque Burle Marx")
@@ -212,7 +226,7 @@ def run_e2e() -> int:
             page.locator("aside button:has-text('Fechar')").first.click()
             time.sleep(0.2)
 
-            # 1b. Menu drawer: dynamic location + version, Modo Local card, zero third-party nav brand mentions
+            # 1b. Menu drawer: dynamic location + version, Modo Local card, Stations toggle & Offline DF Cache
             page.click("#eixoverde-desktop-menu-btn")
             page.wait_for_selector("#eixoverde-account-card", timeout=6000)
             time.sleep(0.3)
@@ -227,6 +241,16 @@ def run_e2e() -> int:
                 and not page.locator("#eixoverde-auth-open-btn").is_visible(),
                 f"badge={sync_badge_guest!r}",
             )
+            check(
+                "Menu drawer renders Estações Tembici & JET toggle and Cache Offline DF card",
+                page.locator("#eixoverde-stations-toggle").is_visible()
+                and page.locator("#eixoverde-offline-cache-card").is_visible()
+                and page.locator("#eixoverde-warm-offline-btn").is_visible(),
+            )
+            page.click("#eixoverde-warm-offline-btn")
+            time.sleep(0.7)
+            cache_card_txt = page.locator("#eixoverde-offline-cache-card").inner_text()
+            check("1-tap Cache Offline DF updates readiness state cleanly", "Pronto Offline" in cache_card_txt, cache_card_txt)
 
             # Compare & Buy modal
             page.locator("button:has-text('Comparar & Comprar')").click()
@@ -260,12 +284,48 @@ def run_e2e() -> int:
                 and not page.locator("h2:has-text('Minha Garagem')").is_visible(),
             )
 
-            # 1d. Right-click MapContextPopup + overflow menu + SavePlaceModal dark contrast
+            # Verify toast stack sits at top-center with zero collision against the top-right GPS button
+            toast_gps_check = page.evaluate(
+                """() => {
+                  const toast = document.querySelector('#eixoverde-toast-stack');
+                  const gps = document.querySelector('#eixoverde-gps-btn');
+                  if (!toast || !gps) return { ok: true, skipped: true };
+                  const t = toast.getBoundingClientRect();
+                  const g = gps.getBoundingClientRect();
+                  const overlaps = !(t.right < g.left - 4 || t.left > g.right + 4 || t.bottom < g.top - 4 || t.top > g.bottom + 4);
+                  return { ok: !overlaps, toastRight: Math.round(t.right), gpsLeft: Math.round(g.left) };
+                }"""
+            )
+            check("Toast stack has zero collision with floating GPS button", toast_gps_check["ok"], json.dumps(toast_gps_check))
+
+            # 1d. Right-click pin-anchored MapContextPopup + centering + overflow menu + SavePlaceModal dark contrast
             page.mouse.click(960, 460, button="right")
             page.wait_for_selector("#eixoverde-map-context-popup", timeout=6000)
-            time.sleep(0.6)
+            time.sleep(0.75)
             pop_text = page.locator("#eixoverde-map-context-popup").inner_text()
+            pin_anchor = page.evaluate(
+                """() => {
+                  const pop = document.querySelector('#eixoverde-map-context-popup');
+                  const pin = document.querySelector('#eixoverde-context-pin-marker');
+                  if (!pop || !pin) return { ok: false };
+                  const pr = pop.getBoundingClientRect();
+                  const mr = pin.getBoundingClientRect();
+                  const popCx = pr.left + pr.width / 2;
+                  const pinCx = mr.left + mr.width / 2;
+                  const gapY = Math.round(mr.top - pr.bottom);
+                  const dx = Math.round(Math.abs(popCx - pinCx));
+                  return {
+                    ok: pr.bottom <= mr.top + 14 && gapY <= 72 && dx <= 90,
+                    gapY,
+                    dx,
+                    popBottom: Math.round(pr.bottom),
+                    pinTop: Math.round(mr.top),
+                  };
+                }"""
+            )
             check("Desktop right-click opens MapContextPopup", "Salvar" in pop_text and "Rotas" in pop_text)
+            check("MapContextPopup anchors directly above marked red pin", pin_anchor["ok"], json.dumps(pin_anchor))
+            save_shot(page, "e2e_phase4_pin_callout_dark.png")
 
             page.locator("#eixoverde-map-context-popup button[aria-label*='Mais opções']").click()
             time.sleep(0.2)
@@ -297,13 +357,26 @@ def run_e2e() -> int:
             )
             check("Meus Locais shows saved place & crisp active tab highlight", "Masterplace QA" in page.locator("aside").first.inner_text() and tab_ok)
 
-            # 1e. Curated DF routes check
+            # 1e. Curated DF routes + 1-5★ Rating & Safety Tags picker
             page.locator("aside button:has-text('Rotas')").first.click()
             time.sleep(0.25)
             rotas_text = page.locator("aside").first.inner_text()
             check(
                 "All 8 curated DF routes listed (Noroeste, Sudoeste, Asa Sul, Lago Sul)",
                 "Noroeste (Burle Marx)" in rotas_text and "Lago Sul: Ponte JK" in rotas_text and "Asa Sul (SQS 114)" in rotas_text,
+            )
+
+            # Rate first curated DF route with 5★ + "Bom asfalto" tag
+            first_rate_btn = page.locator("aside button[data-rate-route]").first
+            first_rate_btn.click()
+            time.sleep(0.2)
+            page.locator("aside button:has-text('Bom asfalto')").first.click()
+            page.locator("aside button[data-submit-rating]").first.click()
+            time.sleep(0.35)
+            check(
+                "1-5★ route rating & safety tag persists inline on DF route card",
+                "5.0 (1)" in page.locator("aside").first.inner_text()
+                and "Bom asfalto" in page.locator("aside").first.inner_text(),
             )
 
             page.locator("aside >> text=Esplanada → Asa Norte").first.click()
@@ -318,6 +391,21 @@ def run_e2e() -> int:
                 and page.locator("aside #eixoverde-weather-warning").is_visible()
                 and "ciclovia molhada" in page.locator("aside #eixoverde-weather-warning").inner_text(),
             )
+            # Color-coded safety segments legend + toggle + zero duplicate weather pill
+            check(
+                "Color-coded safety segments legend renders & toggles cleanly (single #eixoverde-weather-pill)",
+                page.locator("#eixoverde-safety-segments-legend").is_visible()
+                and "Ciclovia" in page.locator("#eixoverde-safety-segments-legend").inner_text()
+                and page.evaluate("() => document.querySelectorAll('#eixoverde-weather-pill').length") == 1,
+            )
+            save_shot(page, "e2e_phase4_safety_segments.png")
+            page.click("#eixoverde-safety-segments-toggle")
+            time.sleep(0.15)
+            seg_off = "Oculto" in page.locator("#eixoverde-safety-segments-toggle").inner_text()
+            page.click("#eixoverde-safety-segments-toggle")
+            time.sleep(0.15)
+            check("Safety segments toggle switches Ativo <-> Oculto", seg_off and "Ativo" in page.locator("#eixoverde-safety-segments-toggle").inner_text())
+
             page.locator("aside button:has-text('Só Ida')").click()
             time.sleep(0.2)
             rt_text = page.locator("aside").first.inner_text()
@@ -438,23 +526,42 @@ def run_e2e() -> int:
             se.locator("header button[aria-label='Alternar tema']").click()
             time.sleep(0.25)
 
+            # Switch to Segway to verify top vehicle pill doesn't truncate "Segway" at 375px
+            se.click("#eixoverde-garage-btn")
+            se.wait_for_selector("h2:has-text('Minha Garagem')", timeout=6000)
+            se.locator("text=Segway Ninebot F2 Pro").click()
+            time.sleep(0.3)
+
             se_hdr = se.evaluate(
                 """() => {
                   const brand = document.querySelector('#eixoverde-mobile-menu-btn').getBoundingClientRect();
                   const rBtns = Array.from(document.querySelectorAll('header > div button')).map(b => b.getBoundingClientRect());
                   const tabs = Array.from(document.querySelectorAll('section #eixoverde-tab-rides')[0].parentElement.querySelectorAll('button')).map(b => b.getBoundingClientRect());
+                  const qa = Array.from(document.querySelectorAll('#eixoverde-quick-actions button')).map(b => b.getBoundingClientRect());
+                  const vehSpan = document.querySelector('#eixoverde-garage-btn span');
                   return {
                     overlaps: brand.right > rBtns[0].left + 1,
                     clips: rBtns[rBtns.length - 1].right > 376,
                     tabsClean: Math.max(...tabs.map(t => t.right)) <= 376 && Math.max(...tabs.map(t => t.height)) <= 38,
+                    qaClean: qa.length === 3 && Math.max(...qa.map(q => q.right)) <= 376 && (Math.max(...qa.map(q => q.top)) - Math.min(...qa.map(q => q.top)) <= 4),
+                    vehUntruncated: vehSpan ? vehSpan.scrollWidth <= vehSpan.clientWidth + 1 : false,
+                    singleMount: document.querySelectorAll('#eixoverde-search-input').length === 1,
                     userSelect: getComputedStyle(document.querySelector('#eixoverde-mobile-menu-btn')).userSelect,
                   };
                 }"""
             )
             check(
-                "iPhone SE (375px) header & 3-tab switch zero overlap/clipping & select-none",
-                not se_hdr["overlaps"] and not se_hdr["clips"] and se_hdr["tabsClean"] and se_hdr["userSelect"] == "none",
+                "iPhone SE (375px) header, 3-col quick actions, Segway pill & single-mount zero clipping",
+                not se_hdr["overlaps"]
+                and not se_hdr["clips"]
+                and se_hdr["tabsClean"]
+                and se_hdr["qaClean"]
+                and se_hdr["vehUntruncated"]
+                and se_hdr["singleMount"]
+                and se_hdr["userSelect"] == "none",
+                json.dumps(se_hdr),
             )
+            save_shot(se, "e2e_phase4_iphone_se_375.png")
 
             se.locator("section >> text=Esplanada → Asa Norte").first.click()
             se.wait_for_selector("section #eixoverde-start-nav-btn", timeout=8000)
@@ -807,6 +914,65 @@ def run_e2e() -> int:
                     route.fulfill(status=201, headers=cors, body=json.dumps([]))
                     return
 
+                if "/rest/v1/community_routes" in url:
+                    if method == "GET":
+                        route.fulfill(
+                            status=200,
+                            headers=cors,
+                            body=json.dumps(
+                                [
+                                    {
+                                        "id": "comm-df-lago-norte",
+                                        "author_id": "99999999-8888-7777-6666-555555555555",
+                                        "author_name": "Marina Ciclista",
+                                        "name": "Ciclovia Orla Lago Norte",
+                                        "description": "Trajeto plano beira-lago com sombra pela manhã.",
+                                        "tag": "Comunidade DF",
+                                        "difficulty": "Fácil",
+                                        "city": "Brasília, DF",
+                                        "profile": "safe",
+                                        "coords": [[-47.871, -15.741, 1012], [-47.848, -15.735, 1018]],
+                                        "waypoints": [[-47.871, -15.741], [-47.848, -15.735]],
+                                        "distance_km": 7.4,
+                                        "ascent_m": 28,
+                                        "descent_m": 24,
+                                        "safety_score": 93,
+                                        "origin_name": "Ponte do Bragueto",
+                                        "dest_name": "QI 5 Lago Norte",
+                                        "avg_rating": 4.9,
+                                        "rating_count": 14,
+                                        "safety_tags": ["bom_asfalto", "paisagem"],
+                                        "created_at": "2026-11-21T09:00:00Z",
+                                        "updated_at": "2026-11-21T09:00:00Z",
+                                        "deleted_at": None,
+                                    }
+                                ]
+                            ),
+                        )
+                        return
+                    route.fulfill(status=201, headers=cors, body=json.dumps([]))
+                    return
+
+                if "/rest/v1/route_ratings" in url:
+                    if method == "GET":
+                        route.fulfill(
+                            status=200,
+                            headers=cors,
+                            body=json.dumps(
+                                [
+                                    {
+                                        "route_id": "comm-df-lago-norte",
+                                        "user_id": "99999999-8888-7777-6666-555555555555",
+                                        "rating": 5,
+                                        "tags": ["bom_asfalto", "paisagem"],
+                                    }
+                                ]
+                            ),
+                        )
+                        return
+                    route.fulfill(status=201, headers=cors, body=json.dumps([]))
+                    return
+
                 if "/rest/v1/user_preferences" in url:
                     route.fulfill(status=200, headers=cors, body="null")
                     return
@@ -883,6 +1049,11 @@ def run_e2e() -> int:
                 "Bidirectional sync pushes local place & pulls cloud route into Rotas Salvas",
                 len(pushed_places) >= 1 and "Rota Cloud Sincronizada" in sidebar_after_sync,
                 f"pushed_places={len(pushed_places)}",
+            )
+            comm_text = cpage.locator("#eixoverde-community-routes").inner_text()
+            check(
+                "Cloud sync populates Comunidade DF routes with author, star rating & safety tags",
+                "Ciclovia Orla Lago Norte" in comm_text and "Marina Ciclista" in comm_text and "Bom asfalto" in comm_text,
             )
             cpage.click("aside #eixoverde-tab-rides")
             cpage.wait_for_selector("aside #eixoverde-rides-panel", timeout=6000)
