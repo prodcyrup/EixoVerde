@@ -87,6 +87,7 @@ export default defineConfig(({ command, mode }) => {
             '**/icons/icon-1024.png',
             '**/icons/icon-foreground.png',
             '**/icons/splash-1280.png',
+            '**/data/cities/*.geojson',
           ],
           runtimeCaching: [
             {
@@ -98,11 +99,11 @@ export default defineConfig(({ command, mode }) => {
               handler: 'NetworkOnly',
             },
             {
-              urlPattern: /\/data\/ciclomapa-df-.*\.geojson$/,
+              urlPattern: /\/data\/(ciclomapa-df-|cities\/).*\.geojson$/,
               handler: 'CacheFirst',
               options: {
-                cacheName: 'eixoverde-geodata-v1',
-                expiration: { maxEntries: 6, maxAgeSeconds: 60 * 60 * 24 * 30 },
+                cacheName: 'eixoverde-geodata-v2',
+                expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 30 },
               },
             },
           ],

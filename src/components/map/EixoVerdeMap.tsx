@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
-import { BRAND } from '../../config/brand';
 import { getMapStyle } from '../../config/providers';
+import { getCapitalBySlug } from '../../data/brazilCities';
 import { buildMobilityStationsCollection } from '../../data/mobilityStations';
 import { buildLaneSpatialIndex, normalizeAngleDiff } from '../../engine/geo';
 import { buildSafetyRouteSegments } from '../../engine/routeSegments';
@@ -39,6 +39,7 @@ export function EixoVerdeMap() {
   const theme = useAppStore((s) => s.theme);
   const basemap = useAppStore((s) => s.basemap);
   const mode = useAppStore((s) => s.mode);
+  const selectedCitySlug = useAppStore((s) => s.selectedCitySlug);
   const showBikeLanes = useAppStore((s) => s.showBikeLanes);
   const showPois = useAppStore((s) => s.showPois);
   const showStations = useAppStore((s) => s.showStations);
@@ -473,11 +474,12 @@ export function EixoVerdeMap() {
     if (!containerRef.current || mapRef.current) return;
 
     const initial = useAppStore.getState();
+    const initialCap = getCapitalBySlug(initial.selectedCitySlug);
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: getMapStyle(initial.theme, initial.basemap) as maplibregl.StyleSpecification | string,
-      center: BRAND.defaultCenter,
-      zoom: BRAND.defaultZoom,
+      center: initialCap.center,
+      zoom: initialCap.zoom,
       pitch: 0,
       bearing: 0,
       maxPitch: 68,
@@ -493,37 +495,6 @@ export function EixoVerdeMap() {
     };
 
     map.on('style.load', onStyleLoad);
-
-    // Fetch slimmed DF CicloMapa GeoJSON files in background
-    const baseUrl = import.meta.env.BASE_URL || '/';
-    Promise.all([
-      fetch(`${baseUrl}data/ciclomapa-df-lanes.geojson`).then((r) => (r.ok ? r.json() : null)),
-      fetch(`${baseUrl}data/ciclomapa-df-pois.geojson`).then((r) => (r.ok ? r.json() : null)),
-    ])
-      .then(([lanes, pois]) => {
-        if (lanes) {
-          lanesDataRef.current = lanes;
-          buildLaneSpatialIndex(lanes);
-          const src = map.getSource(SRC_LANES) as maplibregl.GeoJSONSource | undefined;
-          src?.setData(lanes);
-          // Refresh color-coded safety segments once the DF spatial index is populated
-          syncRoutesToMap(map);
-        }
-        if (pois) {
-          poisDataRef.current = pois;
-          const src = map.getSource(SRC_POIS) as maplibregl.GeoJSONSource | undefined;
-          src?.setData(pois);
-
-          // Merge all 38 real Bike Brasília / Tembici stations with curated JET hubs
-          const mergedStations = buildMobilityStationsCollection(pois);
-          stationsDataRef.current = mergedStations.geojson;
-          const stationSrc = map.getSource(SRC_STATIONS) as maplibregl.GeoJSONSource | undefined;
-          stationSrc?.setData(mergedStations.geojson);
-        }
-      })
-      .catch(() => {
-        // Offline or missing static files — map & curated JET hubs still work cleanly
-      });
 
     // Click alternative route directly on map to select it
     map.on('click', 'ev-alt-routes-line', (e) => {
@@ -546,13 +517,14 @@ export function EixoVerdeMap() {
       };
       const coords = feat.geometry.coordinates as LngLat;
       const isJet = props.provider === 'jet';
+      const activeCap = getCapitalBySlug(useAppStore.getState().selectedCitySlug);
 
       const root = document.createElement('div');
       root.style.cssText = 'font-family:Inter,sans-serif;min-width:190px;padding:2px 0';
 
       const badgeEl = document.createElement('div');
       badgeEl.style.cssText = `font-size:10px;font-weight:800;text-transform:uppercase;color:${isJet ? '#0284c7' : '#ea580c'};margin-bottom:2px`;
-      badgeEl.textContent = isJet ? '⚡ Hub Patinete JET' : '🚲 Bike Brasília (Tembici)';
+      badgeEl.textContent = isJet ? '⚡ Hub Patinete JET' : `🚲 ${activeCap.bikeShareBrand}`;
       root.appendChild(badgeEl);
 
       const titleEl = document.createElement('div');
@@ -751,6 +723,61 @@ export function EixoVerdeMap() {
       styleReadyRef.current = false;
     };
   }, []);
+
+  // Lazy-load the active capital's CicloMapa lanes, POIs, and shared bike-share stations on demand
+  useEffect(() => {
+    let cancelled = false;
+    const cap = getCapitalBySlug(selectedCitySlug);
+    const baseUrl = (import.meta.env.BASE_URL || '/').replace(/\/?$/, '/');
+    const lanesUrl =
+      cap.slug === 'brasilia'
+        ? `${baseUrl}data/ciclomapa-df-lanes.geojson`
+        : `${baseUrl}${cap.lanesUrl}`;
+    const poisUrl =
+      cap.slug === 'brasilia'
+        ? `${baseUrl}data/ciclomapa-df-pois.geojson`
+        : `${baseUrl}${cap.poisUrl}`;
+
+    Promise.all([
+      fetch(lanesUrl).then((r) => (r.ok ? r.json() : null)),
+      fetch(poisUrl).then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([lanes, pois]) => {
+        if (cancelled) return;
+        const map = mapRef.current;
+        if (lanes) {
+          lanesDataRef.current = lanes;
+          buildLaneSpatialIndex(lanes);
+          if (map && styleReadyRef.current) {
+            const src = map.getSource(SRC_LANES) as maplibregl.GeoJSONSource | undefined;
+            src?.setData(lanes);
+            syncRoutesToMap(map);
+          }
+        }
+        if (pois) {
+          poisDataRef.current = pois;
+          const mergedStations = buildMobilityStationsCollection(
+            pois,
+            cap.slug,
+            cap.bikeShareBrand
+          );
+          stationsDataRef.current = mergedStations.geojson;
+          if (map && styleReadyRef.current) {
+            const src = map.getSource(SRC_POIS) as maplibregl.GeoJSONSource | undefined;
+            src?.setData(pois);
+            const stationSrc = map.getSource(SRC_STATIONS) as maplibregl.GeoJSONSource | undefined;
+            stationSrc?.setData(mergedStations.geojson);
+          }
+        }
+      })
+      .catch(() => {
+        // Offline or missing static files — map & fallback stations still work cleanly
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCitySlug]);
 
   // Update map style on theme / basemap changes
   const prevStyleKeyRef = useRef(`${theme}-${basemap}`);

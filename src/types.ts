@@ -337,6 +337,7 @@ export interface UserPreferences {
   showStations?: boolean;
   showHazards: boolean;
   showSafetySegments?: boolean;
+  selectedCitySlug?: string;
   homePlace?: PlaceResult;
   workPlace?: PlaceResult;
   batteryCalibrations?: Record<string, VehicleBatteryCalibration>;

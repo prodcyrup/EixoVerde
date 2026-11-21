@@ -15,7 +15,12 @@ import {
 import { subscribeRealtimeHazards } from '../cloud/realtimeHazards';
 import { BRAND } from '../config/brand';
 import { hasSupabaseConfig } from '../config/providers';
-import { CURATED_DF_ROUTES } from '../data/curatedRoutes';
+import {
+  type BrazilCapitalCity,
+  findNearestCapital,
+  getCapitalBySlug,
+} from '../data/brazilCities';
+import { getCuratedRoutesForCity } from '../data/curatedRoutes';
 import { PRESET_VEHICLES } from '../data/vehicles';
 import {
   computeElevationStats,
@@ -186,6 +191,8 @@ export interface AppStore {
   garageOpen: boolean;
   compareOpen: boolean;
   menuOpen: boolean;
+  cityModalOpen: boolean;
+  selectedCitySlug: string;
   privacyModalOpen: boolean;
   deleteAccountLoading: boolean;
   hazardPickerOpen: boolean;
@@ -202,6 +209,9 @@ export interface AppStore {
   setAuthModalOpen: (open: boolean) => void;
   setMigrationPromptOpen: (open: boolean) => void;
   setPrivacyModalOpen: (open: boolean) => void;
+  setCityModalOpen: (open: boolean) => void;
+  selectCity: (citySlug: string, flyMap?: boolean) => Promise<void>;
+  detectCityFromGps: () => Promise<void>;
   deleteAccount: (wipeLocalData?: boolean) => Promise<{ ok: boolean; error?: string }>;
   handleHardwareBackButton: () => boolean;
   signIn: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
@@ -329,6 +339,35 @@ export function selectActiveVehicle(state: AppStore): VehicleSpec {
   );
 }
 
+/** Reactive Zustand selector for the currently active Brazilian State Capital (out of 27) */
+export function selectActiveCapital(state: AppStore): BrazilCapitalCity {
+  return getCapitalBySlug(state.selectedCitySlug);
+}
+
+const CITY_STORAGE_KEY = 'eixoverde:city';
+
+function getInitialCitySlug(): string {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem(CITY_STORAGE_KEY);
+      if (saved) return getCapitalBySlug(saved).slug;
+    }
+  } catch {
+    // Fallback to brasilia
+  }
+  return 'brasilia';
+}
+
+function syncPersistCitySlug(slug: string): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(CITY_STORAGE_KEY, slug);
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 function savedRouteToCandidate(route: SavedRoute): RouteCandidate {
   const elevation = computeElevationStats(route.coords);
   const surfaces = computeSurfaceBreakdown(route.coords, route.profile);
@@ -388,6 +427,7 @@ function syncPersistTheme(theme: ThemeMode): void {
 
 function persistPrefs(state: AppStore): void {
   syncPersistTheme(state.theme);
+  syncPersistCitySlug(state.selectedCitySlug);
   const prefs: UserPreferences = {
     theme: state.theme,
     basemap: state.basemap,
@@ -400,6 +440,7 @@ function persistPrefs(state: AppStore): void {
     showStations: state.showStations,
     showHazards: state.showHazards,
     showSafetySegments: state.showSafetySegments,
+    selectedCitySlug: state.selectedCitySlug,
     homePlace: state.homePlace,
     workPlace: state.workPlace,
     batteryCalibrations: state.batteryCalibrations,
@@ -470,7 +511,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   fitBoundsNonce: 0,
   flyToTarget: null,
 
-  savedRoutes: CURATED_DF_ROUTES,
+  savedRoutes: getCuratedRoutesForCity(getInitialCitySlug()),
   savedPlaces: [],
   hazards: [],
   exploreTab: 'routes',
@@ -494,6 +535,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   garageOpen: false,
   compareOpen: false,
   menuOpen: false,
+  cityModalOpen: false,
+  selectedCitySlug: getInitialCitySlug(),
   privacyModalOpen: false,
   deleteAccountLoading: false,
   hazardPickerOpen: false,
@@ -521,8 +564,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
     void configureNativeStatusBar(theme);
 
+    const selectedCitySlug = getCapitalBySlug(
+      prefs.selectedCitySlug ?? get().selectedCitySlug ?? 'brasilia'
+    ).slug;
+    syncPersistCitySlug(selectedCitySlug);
+    const cityCurated = getCuratedRoutesForCity(selectedCitySlug);
+
     const userIds = new Set(userRoutes.map((r) => r.id));
-    const mergedRoutes = [...userRoutes, ...CURATED_DF_ROUTES.filter((c) => !userIds.has(c.id))];
+    const mergedRoutes = [...userRoutes, ...cityCurated.filter((c) => !userIds.has(c.id))];
 
     const homeSaved = savedPlaces.find((p) => p.category === 'home');
     const workSaved = savedPlaces.find((p) => p.category === 'work');
@@ -561,6 +610,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       showStations: prefs.showStations ?? true,
       showHazards: prefs.showHazards ?? true,
       showSafetySegments: prefs.showSafetySegments ?? true,
+      selectedCitySlug,
       homePlace: homeSaved
         ? { id: homeSaved.id, name: homeSaved.label, subtitle: homeSaved.address, coords: homeSaved.coords, source: 'curated' }
         : prefs.homePlace,
@@ -812,6 +862,52 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({ privacyModalOpen: open });
   },
 
+  setCityModalOpen(open) {
+    set({ cityModalOpen: open });
+  },
+
+  async selectCity(citySlug, flyMap = true) {
+    const cap = getCapitalBySlug(citySlug);
+    syncPersistCitySlug(cap.slug);
+    const personalRoutes = get().savedRoutes.filter((r) => !r.isCurated);
+    const personalIds = new Set(personalRoutes.map((r) => r.id));
+    const cityCurated = getCuratedRoutesForCity(cap.slug);
+    const mergedRoutes = [...personalRoutes, ...cityCurated.filter((c) => !personalIds.has(c.id))];
+
+    if (get().mode === 'preview') {
+      get().clearActiveRoute();
+    }
+
+    set({
+      selectedCitySlug: cap.slug,
+      cityModalOpen: false,
+      menuOpen: false,
+      savedRoutes: mergedRoutes,
+    });
+
+    if (flyMap) {
+      get().flyTo(cap.center, cap.zoom);
+    }
+
+    void triggerHaptic('light');
+    persistPrefs(get());
+    void get().refreshWeather(cap.center);
+    void get().refreshOfflineCache();
+    get().pushToast(
+      `Explorar ${cap.label}`,
+      `${cap.totalKm} km de malha cicloviária • Região ${cap.region}`,
+      'emerald'
+    );
+  },
+
+  async detectCityFromGps() {
+    const gpsPlace = await get().locateCurrentPosition({ silent: false, flyToUser: false });
+    const pos = gpsPlace?.coords ?? get().nav.currentPos;
+    if (!pos) return;
+    const nearest = findNearestCapital(pos);
+    await get().selectCity(nearest.slug, true);
+  },
+
   async deleteAccount(wipeLocalData = false) {
     const user = get().authUser;
     if (!user) {
@@ -853,6 +949,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const s = get();
     if (s.privacyModalOpen) {
       set({ privacyModalOpen: false });
+      return true;
+    }
+    if (s.cityModalOpen) {
+      set({ cityModalOpen: false });
       return true;
     }
     if (s.authModalOpen) {
@@ -934,7 +1034,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({ initialized: true });
     void hideNativeSplashScreen();
     void get().initAuthAndSync();
-    void get().refreshWeather(BRAND.defaultCenter);
+    const activeCap = getCapitalBySlug(get().selectedCitySlug);
+    void get().refreshWeather(activeCap.center);
     void get().refreshOfflineCache();
 
     // Register Android Hardware Back-Button & Custom Scheme Deep-Link (`br.com.eixoverde.app://...`) listeners
@@ -991,7 +1092,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
 
     // Automatically locate user's real GPS position on startup so Point A is always accurate
-    void get().locateCurrentPosition({ silent: true, flyToUser: true });
+    void get().locateCurrentPosition({ silent: true, flyToUser: activeCap.slug === 'brasilia' });
   },
 
   async refreshWeather(coords) {
@@ -1398,22 +1499,27 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   async refreshOfflineCache() {
-    const status = await checkOfflineDfCacheStatus(import.meta.env.BASE_URL);
+    const status = await checkOfflineDfCacheStatus(import.meta.env.BASE_URL, get().selectedCitySlug);
     set({ offlineCache: status });
   },
 
   async warmOfflineCache() {
     set({ offlineCacheLoading: true });
-    const status = await warmOfflineDfCache(import.meta.env.BASE_URL);
+    const cap = getCapitalBySlug(get().selectedCitySlug);
+    const status = await warmOfflineDfCache(import.meta.env.BASE_URL, cap.slug);
     set({ offlineCache: status, offlineCacheLoading: false });
     if (status.ready) {
       get().pushToast(
-        'Cache Offline DF pronto!',
-        'Ciclovias, estações e POIs de Brasília salvos neste dispositivo.',
+        `Cache Offline ${cap.stateCode} pronto!`,
+        `Ciclovias, estações e POIs de ${cap.name} salvos neste dispositivo.`,
         'emerald'
       );
     } else {
-      get().pushToast('Cache parcialmente atualizado', 'Conecte-se à internet para baixar todos os dados do DF.', 'amber');
+      get().pushToast(
+        'Cache parcialmente atualizado',
+        `Conecte-se à internet para baixar todos os dados de ${cap.name}.`,
+        'amber'
+      );
     }
   },
 
