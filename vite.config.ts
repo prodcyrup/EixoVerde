@@ -32,8 +32,15 @@ export default defineConfig(({ command }) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['icons/eixoverde-icon.svg', 'data/ciclomapa-df-pois.geojson'],
+        includeAssets: [
+          'icons/eixoverde-icon.svg',
+          'icons/apple-touch-icon.png',
+          'icons/icon-192.png',
+          'icons/icon-512.png',
+          'data/ciclomapa-df-pois.geojson',
+        ],
         manifest: {
+          id: 'br.com.eixoverde.app',
           name: 'EixoVerde — Navegação & Ciclovias',
           short_name: 'EixoVerde',
           description:
@@ -47,6 +54,24 @@ export default defineConfig(({ command }) => {
           scope: base,
           icons: [
             {
+              src: 'icons/icon-192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
+              src: 'icons/icon-512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'any maskable',
+            },
+            {
+              src: 'icons/icon-1024.png',
+              sizes: '1024x1024',
+              type: 'image/png',
+              purpose: 'any',
+            },
+            {
               src: 'icons/eixoverde-icon.svg',
               sizes: 'any',
               type: 'image/svg+xml',
@@ -56,6 +81,11 @@ export default defineConfig(({ command }) => {
         },
         workbox: {
           maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+          globIgnores: [
+            '**/icons/icon-1024.png',
+            '**/icons/icon-foreground.png',
+            '**/icons/splash-1280.png',
+          ],
           runtimeCaching: [
             {
               urlPattern: /\/(auth|rest|functions|storage|realtime)\/v1\//i,

@@ -22,17 +22,18 @@ Siga este guia rápido (cerca de 5 minutos) para ativar **Contas na Nuvem**, **S
 3. Clique em **Run**.
 4. *(Fase 3 — Histórico de Pedais na Nuvem)* Repita os passos 1–3 com o arquivo [`supabase/migrations/20261121000002_eixoverde_phase3_rides.sql`](../supabase/migrations/20261121000002_eixoverde_phase3_rides.sql) para sincronizar o histórico **Meus Pedais** (`ride_sessions` com PostGIS `LineString` + RLS privado). Caso ainda não tenha rodado esta migração, o app salva seus pedais normalmente em IndexedDB e sincroniza automaticamente assim que a tabela existir.
 5. *(Fase 4 — Comunidade DF, Avaliações 1–5★ & Alertas Realtime)* Repita os passos 1–3 com o arquivo [`supabase/migrations/20261121000003_eixoverde_phase4_community.sql`](../supabase/migrations/20261121000003_eixoverde_phase4_community.sql) para habilitar **Rotas da Comunidade DF** (`community_routes` com PostGIS `LineString` + leitura pública / escrita do autor), **Avaliações 1–5★ com tags de segurança** (`route_ratings` + trigger de média automática) e **Supabase Realtime** em `hazard_reports`.
+6. *(Fase 5 — Exclusão de Conta In-App para Google Play Store & Apple App Store)* Repita os passos 1–3 com o arquivo [`supabase/migrations/20261121000004_eixoverde_phase5_account_delete.sql`](../supabase/migrations/20261121000004_eixoverde_phase5_account_delete.sql) para criar a função RPC `public.delete_my_account()` (`SECURITY DEFINER`), permitindo que usuários autenticados excluam permanentemente sua conta e dados na nuvem diretamente dentro do aplicativo.
 
 O script é **100% idempotente** (pode ser executado novamente sem erro) e cria automaticamente:
 - Extensão **PostGIS** no schema `extensions` (compatível com Supabase Cloud).
 - Tabelas com **Row Level Security (RLS)** habilitado: `profiles`, `saved_routes`, `saved_places`, `custom_vehicles`, `hazard_reports`, `hazard_confirmations`, `ride_sessions`, `community_routes`, `route_ratings` e `user_preferences`.
 - Triggers automáticos de geometria (`LineString` e `Point` SRID 4326), contagem de confirmações de alertas, média de avaliações da comunidade e criação de perfil no cadastro.
-- Funções espaciais RPC `get_hazards_in_bounds(...)` (com índice GIST) e `confirm_hazard(...)`.
+- Funções espaciais RPC `get_hazards_in_bounds(...)` (com índice GIST), `confirm_hazard(...)` e `delete_my_account()`.
 - Publicação `supabase_realtime` para atualizações ao vivo de `hazard_reports`.
 
 ---
 
-## Passo 3 — Configurar URLs de Autenticação (Magic Link & Recuperação de Senha)
+## Passo 3 — Configurar URLs de Autenticação (Magic Link, OAuth & Deep-Link Mobile)
 
 No painel do Supabase, vá em **Authentication → URL Configuration**:
 
@@ -40,11 +41,15 @@ No painel do Supabase, vá em **Authentication → URL Configuration**:
   ```text
   https://prodcyrup.github.io/EixoVerde/
   ```
-- **Redirect URLs** (adicione todas abaixo):
+- **Redirect URLs** (adicione todas abaixo para Web + Apps Nativos Android/iOS):
   ```text
   https://prodcyrup.github.io/EixoVerde/**
   http://localhost:5173/**
   http://127.0.0.1:5173/**
+  br.com.eixoverde.app://auth-callback
+  capacitor://localhost
+  http://localhost
+  https://localhost
   ```
 
 Clique em **Save**.

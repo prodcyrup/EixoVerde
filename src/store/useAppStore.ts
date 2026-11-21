@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import {
+  consumeDeepLinkAuth,
+  deleteCloudAccount,
   getCurrentSession,
   sendPasswordReset,
   signInWithGoogle as authSignInWithGoogle,
@@ -34,6 +36,13 @@ import {
 import { planMultiProfileRoutes, reverseGeocode } from '../engine/routing';
 import { computeUpdatedBatteryCalibration } from '../engine/telemetry';
 import { fetchLiveWeather } from '../engine/weather';
+import {
+  configureNativeStatusBar,
+  getNativeOrWebPosition,
+  hideNativeSplashScreen,
+  registerNativeAppListeners,
+  triggerHaptic,
+} from '../mobile/nativeBridge';
 import { indexedDbStorage } from '../storage/indexedDbAdapter';
 import { repository } from '../storage/repository';
 import { supabaseAdapter } from '../storage/supabaseAdapter';
@@ -177,6 +186,8 @@ export interface AppStore {
   garageOpen: boolean;
   compareOpen: boolean;
   menuOpen: boolean;
+  privacyModalOpen: boolean;
+  deleteAccountLoading: boolean;
   hazardPickerOpen: boolean;
   pendingHazardCoords: LngLat | null;
   pendingSavePlace: { place: PlaceResult; defaultCategory: SavedPlaceCategory } | null;
@@ -190,6 +201,9 @@ export interface AppStore {
   initAuthAndSync: () => Promise<void>;
   setAuthModalOpen: (open: boolean) => void;
   setMigrationPromptOpen: (open: boolean) => void;
+  setPrivacyModalOpen: (open: boolean) => void;
+  deleteAccount: (wipeLocalData?: boolean) => Promise<{ ok: boolean; error?: string }>;
+  handleHardwareBackButton: () => boolean;
   signIn: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   signUp: (
     email: string,
@@ -450,6 +464,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   garageOpen: false,
   compareOpen: false,
   menuOpen: false,
+  privacyModalOpen: false,
+  deleteAccountLoading: false,
   hazardPickerOpen: false,
   pendingHazardCoords: null,
   pendingSavePlace: null,
@@ -472,6 +488,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     if (typeof document !== 'undefined') {
       document.documentElement.classList.toggle('dark', theme === 'dark');
     }
+    void configureNativeStatusBar(theme);
 
     const userIds = new Set(userRoutes.map((r) => r.id));
     const mergedRoutes = [...userRoutes, ...CURATED_DF_ROUTES.filter((c) => !userIds.has(c.id))];
@@ -760,6 +777,108 @@ export const useAppStore = create<AppStore>((set, get) => ({
     get().pushToast('Sessão encerrada', 'Seus dados permanecem salvos neste dispositivo.', 'slate');
   },
 
+  setPrivacyModalOpen(open) {
+    set({ privacyModalOpen: open });
+  },
+
+  async deleteAccount(wipeLocalData = false) {
+    const user = get().authUser;
+    if (!user) {
+      return { ok: false, error: 'Nenhuma conta autenticada no momento.' };
+    }
+    set({ deleteAccountLoading: true });
+    const res = await deleteCloudAccount(user.id);
+    if (!res.ok) {
+      set({ deleteAccountLoading: false });
+      return { ok: false, error: res.error || 'Não foi possível excluir a conta.' };
+    }
+
+    await syncEngine.setAuthenticatedUser(null);
+    if (wipeLocalData) {
+      await indexedDbStorage.resetForTests();
+      await get().hydrateFromStorage();
+    }
+
+    set({
+      authUser: null,
+      deleteAccountLoading: false,
+      authRecoveryMode: false,
+      migrationPromptOpen: false,
+      menuOpen: false,
+      syncStatus: hasSupabaseConfig() ? 'idle' : 'local',
+    });
+
+    get().pushToast(
+      'Conta excluída permanentemente',
+      wipeLocalData
+        ? 'Seus dados na nuvem e neste dispositivo foram removidos.'
+        : 'Sua conta na nuvem foi excluída. Seus dados locais foram mantidos neste aparelho.',
+      'emerald'
+    );
+    return { ok: true };
+  },
+
+  handleHardwareBackButton() {
+    const s = get();
+    if (s.privacyModalOpen) {
+      set({ privacyModalOpen: false });
+      return true;
+    }
+    if (s.authModalOpen) {
+      set({ authModalOpen: false, authRecoveryMode: false });
+      return true;
+    }
+    if (s.migrationPromptOpen) {
+      set({ migrationPromptOpen: false });
+      return true;
+    }
+    if (s.pendingRideSummary) {
+      set({ pendingRideSummary: null });
+      return true;
+    }
+    if (s.hazardPickerOpen) {
+      set({ hazardPickerOpen: false, pendingHazardCoords: null });
+      return true;
+    }
+    if (s.pendingSavePlace) {
+      set({ pendingSavePlace: null });
+      return true;
+    }
+    if (s.compareOpen) {
+      set({ compareOpen: false });
+      return true;
+    }
+    if (s.garageOpen) {
+      set({ garageOpen: false });
+      return true;
+    }
+    if (s.menuOpen) {
+      set({ menuOpen: false });
+      return true;
+    }
+    if (s.mapContextPin) {
+      s.closeMapContextPin();
+      return true;
+    }
+    if (s.mapPickTarget) {
+      set({ mapPickTarget: null });
+      return true;
+    }
+    if (s.mode === 'navigate') {
+      s.stopNavigation();
+      return true;
+    }
+    if (s.mode === 'preview') {
+      s.clearActiveRoute();
+      return true;
+    }
+    if (s.replayingRideId) {
+      set({ replayingRideId: null });
+      return true;
+    }
+    return false;
+  },
+
   async syncNow() {
     const ok = await syncEngine.syncNow({ force: true });
     await get().hydrateFromStorage();
@@ -782,9 +901,47 @@ export const useAppStore = create<AppStore>((set, get) => ({
     if (get().initialized) return;
     await get().hydrateFromStorage();
     set({ initialized: true });
+    void hideNativeSplashScreen();
     void get().initAuthAndSync();
     void get().refreshWeather(BRAND.defaultCenter);
     void get().refreshOfflineCache();
+
+    // Register Android Hardware Back-Button & Custom Scheme Deep-Link (`br.com.eixoverde.app://...`) listeners
+    registerNativeAppListeners({
+      onBackPress: () => get().handleHardwareBackButton(),
+      onDeepLink: (parsed) => {
+        void (async () => {
+          if (parsed.accessToken || parsed.authCode) {
+            const res = await consumeDeepLinkAuth(parsed);
+            if (res.error) {
+              get().pushToast('Falha na autenticação', res.error, 'rose');
+            } else if (res.isRecovery) {
+              set({ authRecoveryMode: true, authModalOpen: true, authUser: res.user ?? get().authUser });
+            } else if (res.user) {
+              set({ authUser: res.user, authModalOpen: false });
+              await syncEngine.setAuthenticatedUser(res.user.id);
+              void syncEngine.syncNow({ force: true });
+              get().pushToast('Sessão iniciada!', `Bem-vindo(a), ${res.user.displayName || res.user.email}`, 'emerald');
+            }
+          }
+          if (parsed.shareParam) {
+            const sharedRoute = decodeShareableRouteFromUrl(parsed.shareParam);
+            if (sharedRoute && sharedRoute.waypoints.length >= 2) {
+              const originPlace = await reverseGeocode(sharedRoute.waypoints[0]);
+              const destPlace = await reverseGeocode(sharedRoute.waypoints[sharedRoute.waypoints.length - 1]);
+              set({
+                origin: originPlace,
+                destination: destPlace,
+                viaPoints: sharedRoute.waypoints.slice(1, -1),
+                mode: 'preview',
+              });
+              await get().recalculateRoute(sharedRoute.waypoints);
+              get().pushToast('Rota compartilhada aberta', sharedRoute.name, 'emerald');
+            }
+          }
+        })();
+      },
+    });
 
     // Check if opened from a shared route link (?share=...)
     const shared = decodeShareableRouteFromUrl();
@@ -985,28 +1142,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   async locateCurrentPosition({ silent = false, flyToUser = false } = {}) {
-    if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
-      if (!silent) {
-        get().pushToast('GPS indisponível', 'Seu navegador não suporta geolocalização.', 'amber');
-      }
-      return null;
-    }
-
-    const coords = await new Promise<{ pos: LngLat; acc: number } | null>((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (p) =>
-          resolve({
-            pos: [+p.coords.longitude.toFixed(6), +p.coords.latitude.toFixed(6)],
-            acc: Math.round(p.coords.accuracy || 0),
-          }),
-        () => resolve(null),
-        { enableHighAccuracy: true, timeout: 6500, maximumAge: 25000 }
-      );
-    });
+    const coords = await getNativeOrWebPosition(6500);
 
     if (!coords) {
       if (!silent) {
-        get().pushToast('Permissão de GPS necessária', 'Ative a localização no navegador para usar seu ponto atual.', 'amber');
+        get().pushToast('Permissão de GPS necessária', 'Ative a localização no aparelho para usar seu ponto atual.', 'amber');
       }
       return null;
     }
@@ -1049,6 +1189,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   toggleTheme() {
     const next: ThemeMode = get().theme === 'dark' ? 'light' : 'dark';
     document.documentElement.classList.toggle('dark', next === 'dark');
+    void configureNativeStatusBar(next);
+    void triggerHaptic('light');
     set({ theme: next });
     persistPrefs(get());
   },

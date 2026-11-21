@@ -20,6 +20,7 @@ export function AuthModal() {
   const authLoading = useAppStore((s) => s.authLoading);
   const authRecoveryMode = useAppStore((s) => s.authRecoveryMode);
   const setAuthModalOpen = useAppStore((s) => s.setAuthModalOpen);
+  const setPrivacyModalOpen = useAppStore((s) => s.setPrivacyModalOpen);
   const signIn = useAppStore((s) => s.signIn);
   const signUp = useAppStore((s) => s.signUp);
   const sendMagicLink = useAppStore((s) => s.sendMagicLink);
@@ -370,6 +371,17 @@ export function AuthModal() {
                     ? 'Enviar Link Mágico'
                     : 'Enviar Link de Recuperação'}
           </button>
+
+          <div className="pt-1 text-center">
+            <button
+              id="eixoverde-auth-privacy-link"
+              type="button"
+              onClick={() => setPrivacyModalOpen(true)}
+              className="text-[11px] font-semibold text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-emerald-600 dark:text-slate-400 dark:decoration-slate-700 dark:hover:text-emerald-400"
+            >
+              Política de Privacidade &amp; Termos de Uso (LGPD)
+            </button>
+          </div>
         </form>
       </div>
     </div>
