@@ -56,8 +56,8 @@ export function ExplorePanel() {
   const [renamingRouteId, setRenamingRouteId] = useState<string | null>(null);
   const [renameRouteVal, setRenameRouteVal] = useState('');
 
-  // Phase 4: Inline 1-5★ rating & safety tag picker state
-  const [ratingRouteId, setRatingRouteId] = useState<string | null>(null);
+  // Phase 4: Inline 1-5★ rating & safety tag picker state (scoped by card instance key so duplicate cards don't both open)
+  const [ratingCardKey, setRatingCardKey] = useState<string | null>(null);
   const [draftStars, setDraftStars] = useState<number>(5);
   const [draftTags, setDraftTags] = useState<RouteSafetyTag[]>([]);
 
@@ -151,13 +151,13 @@ export function ExplorePanel() {
   const workSaved = savedPlaces.find((p) => p.category === 'work');
   const favoritePlaces = savedPlaces.filter((p) => p.category === 'favorite');
 
-  const openRatingEditor = (routeId: string) => {
-    if (ratingRouteId === routeId) {
-      setRatingRouteId(null);
+  const openRatingEditor = (cardKey: string, routeId: string) => {
+    if (ratingCardKey === cardKey) {
+      setRatingCardKey(null);
       return;
     }
     const existing = routeRatings[routeId];
-    setRatingRouteId(routeId);
+    setRatingCardKey(cardKey);
     setDraftStars(existing?.userRating ?? Math.max(1, Math.round(existing?.avgRating || 5)));
     setDraftTags(existing?.userTags ?? []);
   };
@@ -171,6 +171,7 @@ export function ExplorePanel() {
     opts: { showSavedBadge?: boolean; isCommunityCard?: boolean } = {}
   ) => {
     const { showSavedBadge = false, isCommunityCard = false } = opts;
+    const cardKey = `${showSavedBadge ? 'saved-' : isCommunityCard ? 'comm-' : 'bsb-'}${route.id}`;
     const communityMeta = isCommunityCard ? (route as CommunityRoute) : null;
     const telemetry = computeRouteTelemetry(
       {
@@ -199,7 +200,7 @@ export function ExplorePanel() {
     );
 
     const isRenaming = renamingRouteId === route.id;
-    const isRatingOpen = ratingRouteId === route.id;
+    const isRatingOpen = ratingCardKey === cardKey;
     const agg = routeRatings[route.id];
     const displayAvg = agg?.avgRating || communityMeta?.avgRating || 0;
     const displayCount = agg?.ratingCount || communityMeta?.ratingCount || 0;
@@ -210,17 +211,17 @@ export function ExplorePanel() {
 
     return (
       <div
-        key={`${showSavedBadge ? 'saved-' : isCommunityCard ? 'comm-' : 'bsb-'}${route.id}`}
+        key={cardKey}
         onClick={() => {
           if (!isRenaming && !isRatingOpen) loadSavedRoute(route);
         }}
         className="group cursor-pointer rounded-2xl border border-slate-200/80 bg-white/90 p-3.5 transition-all hover:border-emerald-500/40 hover:shadow-md dark:border-slate-700/70 dark:bg-slate-800/70 dark:hover:border-emerald-500/40"
       >
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start justify-between gap-1.5">
           <div className="min-w-0 flex-1">
-            <div className="mb-1 flex flex-wrap items-center gap-1.5">
+            <div className="mb-1 flex items-center gap-1 overflow-hidden whitespace-nowrap">
               <span
-                className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
                   route.difficulty === 'Fácil'
                     ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
                     : route.difficulty === 'Moderado'
@@ -230,16 +231,16 @@ export function ExplorePanel() {
               >
                 {route.difficulty}
               </span>
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">
-                <ShieldCheck className="h-3 w-3" />
+              <span className="inline-flex shrink-0 items-center gap-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">
+                <ShieldCheck className="h-3 w-3 shrink-0" />
                 {route.safetyScore}% segura
               </span>
               {communityMeta ? (
-                <span className="text-[10px] font-semibold text-sky-600 dark:text-sky-400">
+                <span className="truncate text-[10px] font-semibold text-sky-600 dark:text-sky-400">
                   • por {communityMeta.authorName}
                 </span>
               ) : (
-                <span className="text-[10px] font-medium text-slate-400">• {route.city}</span>
+                <span className="truncate text-[10px] font-medium text-slate-400">• {route.city}</span>
               )}
             </div>
 
@@ -305,7 +306,7 @@ export function ExplorePanel() {
             )}
           </div>
 
-          <div className="flex shrink-0 items-center gap-0.5">
+          <div className="flex shrink-0 items-center">
             {canPublish && (
               <button
                 type="button"
@@ -316,7 +317,7 @@ export function ExplorePanel() {
                 }}
                 aria-label="Publicar na Comunidade DF"
                 title="Publicar na Comunidade DF"
-                className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/50"
+                className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/50"
               >
                 <Globe className="h-3.5 w-3.5" />
               </button>
@@ -331,7 +332,7 @@ export function ExplorePanel() {
                 }}
                 aria-label="Renomear rota"
                 title="Renomear rota"
-                className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-emerald-600 dark:hover:bg-slate-700"
+                className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-emerald-600 dark:hover:bg-slate-700"
               >
                 <Pencil className="h-3.5 w-3.5" />
               </button>
@@ -344,7 +345,7 @@ export function ExplorePanel() {
                   void toggleFavoriteRoute(route.id);
                 }}
                 aria-label="Favoritar rota"
-                className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-rose-500 dark:hover:bg-slate-700"
+                className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-rose-500 dark:hover:bg-slate-700"
               >
                 <Heart className={`h-4 w-4 ${route.isFavorite ? 'fill-rose-500 text-rose-500' : ''}`} />
               </button>
@@ -357,7 +358,7 @@ export function ExplorePanel() {
                   void deleteSavedRoute(route.id);
                 }}
                 aria-label="Excluir rota"
-                className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/50"
+                className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/50"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -371,7 +372,7 @@ export function ExplorePanel() {
                 }}
                 aria-label="Remover da Comunidade DF"
                 title="Remover da Comunidade DF"
-                className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/50"
+                className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/50"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -395,7 +396,7 @@ export function ExplorePanel() {
                 data-rate-route={route.id}
                 onClick={(e) => {
                   e.stopPropagation();
-                  openRatingEditor(route.id);
+                  openRatingEditor(cardKey, route.id);
                 }}
                 className="inline-flex items-center gap-1 rounded-md bg-amber-500/12 px-1.5 py-0.5 text-[11px] font-bold text-amber-700 transition-colors hover:bg-amber-500/20 dark:text-amber-300"
               >
@@ -464,7 +465,7 @@ export function ExplorePanel() {
             <div className="flex items-center justify-end gap-1.5">
               <button
                 type="button"
-                onClick={() => setRatingRouteId(null)}
+                onClick={() => setRatingCardKey(null)}
                 className="rounded-lg px-2.5 py-1 text-[11px] font-semibold text-slate-500 hover:bg-slate-200/60 dark:text-slate-400"
               >
                 Cancelar
@@ -474,7 +475,7 @@ export function ExplorePanel() {
                 data-submit-rating={route.id}
                 onClick={async () => {
                   await rateRoute(route.id, draftStars, draftTags);
-                  setRatingRouteId(null);
+                  setRatingCardKey(null);
                 }}
                 className="rounded-lg bg-emerald-600 px-3 py-1 text-[11px] font-extrabold text-white hover:bg-emerald-500"
               >

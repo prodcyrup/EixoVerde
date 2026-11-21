@@ -718,21 +718,21 @@ export function RoutePreviewPanel() {
                     </button>
                   </div>
                   {showSafetySegments && (
-                    <div className="mt-1.5 grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] font-semibold text-slate-600 dark:text-slate-300 sm:grid-cols-4">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="h-2 w-3.5 shrink-0 rounded-full bg-emerald-500" />
+                    <div className="mt-1.5 grid grid-cols-4 gap-x-1.5 gap-y-1 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+                      <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                        <span className="h-2 w-2.5 shrink-0 rounded-full bg-emerald-500" />
                         Ciclovia
                       </span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="h-2 w-3.5 shrink-0 rounded-full bg-sky-500" />
+                      <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                        <span className="h-2 w-2.5 shrink-0 rounded-full bg-sky-500" />
                         Ciclofaixa
                       </span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="h-2 w-3.5 shrink-0 rounded-full bg-amber-500" />
+                      <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                        <span className="h-2 w-2.5 shrink-0 rounded-full bg-amber-500" />
                         Via Calma
                       </span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="h-2 w-3.5 shrink-0 rounded-full bg-rose-500" />
+                      <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                        <span className="h-2 w-2.5 shrink-0 rounded-full bg-rose-500" />
                         Via Comum
                       </span>
                     </div>

@@ -366,17 +366,20 @@ def run_e2e() -> int:
                 "Noroeste (Burle Marx)" in rotas_text and "Lago Sul: Ponte JK" in rotas_text and "Asa Sul (SQS 114)" in rotas_text,
             )
 
-            # Rate first curated DF route with 5★ + "Bom asfalto" tag
+            # Rate first curated DF route with 5★ + "Bom asfalto" tag (must open ONLY 1 inline drawer even when favorited)
             first_rate_btn = page.locator("aside button[data-rate-route]").first
             first_rate_btn.click()
             time.sleep(0.2)
+            open_rating_drawers = page.locator("aside button[data-submit-rating]").count()
             page.locator("aside button:has-text('Bom asfalto')").first.click()
             page.locator("aside button[data-submit-rating]").first.click()
             time.sleep(0.35)
             check(
-                "1-5★ route rating & safety tag persists inline on DF route card",
-                "5.0 (1)" in page.locator("aside").first.inner_text()
+                "1-5★ route rating opens only on clicked card & persists inline with safety tag",
+                open_rating_drawers == 1
+                and "5.0 (1)" in page.locator("aside").first.inner_text()
                 and "Bom asfalto" in page.locator("aside").first.inner_text(),
+                f"open_drawers={open_rating_drawers}",
             )
 
             page.locator("aside >> text=Esplanada → Asa Norte").first.click()
@@ -391,10 +394,19 @@ def run_e2e() -> int:
                 and page.locator("aside #eixoverde-weather-warning").is_visible()
                 and "ciclovia molhada" in page.locator("aside #eixoverde-weather-warning").inner_text(),
             )
-            # Color-coded safety segments legend + toggle + zero duplicate weather pill
+            # Color-coded safety segments legend + single-line check + toggle + zero duplicate weather pill
+            legend_single_line = page.evaluate(
+                """() => {
+                  const items = Array.from(document.querySelectorAll('#eixoverde-safety-segments-legend .grid > span'));
+                  if (items.length !== 4) return false;
+                  const heights = items.map(el => Math.round(el.getBoundingClientRect().height));
+                  return Math.max(...heights) <= 20;
+                }"""
+            )
             check(
-                "Color-coded safety segments legend renders & toggles cleanly (single #eixoverde-weather-pill)",
+                "Color-coded safety segments legend renders single-line & toggles cleanly (single #eixoverde-weather-pill)",
                 page.locator("#eixoverde-safety-segments-legend").is_visible()
+                and legend_single_line
                 and "Ciclovia" in page.locator("#eixoverde-safety-segments-legend").inner_text()
                 and page.evaluate("() => document.querySelectorAll('#eixoverde-weather-pill').length") == 1,
             )
