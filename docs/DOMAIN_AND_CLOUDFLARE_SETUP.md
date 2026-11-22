@@ -31,7 +31,8 @@ O **EixoVerde** publica um único build unificado (`npm run build` → `dist/`) 
 5. Clique em **Save and Deploy**.
 6. Após o primeiro deploy concluir, abra a aba **Custom domains** do projeto Pages e adicione:
    - `eixoverde.com`
-   - `www.eixoverde.com` *(o arquivo `public/_redirects` redireciona automaticamente `www.eixoverde.com/*` → `https://eixoverde.com/*` com HTTP 301)*
+   - `www.eixoverde.com`
+7. *(Opcional recomendado)* Para redirecionar `www.eixoverde.com` → `https://eixoverde.com` com HTTP 301, abra o domínio `eixoverde.com` no painel Cloudflare → **Rules → Redirect Rules → Create rule** → use o template **Redirect from WWW to Root**. *(O arquivo `_redirects` do Pages trata apenas caminhos relativos, enquanto o recurso automático Pretty URLs já serve `/privacidade` e `/exclusao-conta` a partir dos arquivos `.html` sem loop.)*
 
 > Os cabeçalhos de segurança (`X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`), cache otimizado de GeoJSON/assets e `Content-Type: text/plain` para `/app-ads.txt` já são aplicados automaticamente via [`public/_headers`](../public/_headers).
 
@@ -76,15 +77,22 @@ Clique em **Save**.
 ## 4. Atualizar Origens Autorizadas no Google Cloud Console (OAuth) & MapTiler
 
 ### Google Cloud Console (OAuth Client ID — Web application)
-Em **APIs & Services → Credentials → OAuth 2.0 Client IDs**:
-- Em **Authorized JavaScript origins**, adicione:
+Em **Google Auth Platform → Clientes → EixoVerde Web**:
+- Em **Origens JavaScript autorizadas**, adicione:
   ```text
   https://eixoverde.com
   ```
-- Em **Authorized redirect URIs**, mantenha a callback do Supabase:
+- Em **URIs de redirecionamento autorizados**, mantenha a callback do Supabase:
   ```text
   https://tuocwnjnkihchlxxqmgi.supabase.co/auth/v1/callback
   ```
+
+### Exibir "EixoVerde" + logo (em vez de `tuocwnjnkihchlxxqmgi.supabase.co`) na tela de Login com Google (Gratuito)
+Por padrão, enquanto a marca não é verificada no Google Cloud, o Google oculta o nome do app e exibe o domínio da URL de callback (`tuocwnjnkihchlxxqmgi.supabase.co`). Você resolve isso **sem custo**:
+1. Acesse [Google Search Console](https://search.google.com/search-console) com a **mesma conta Google** do Google Cloud Console e verifique a propriedade de domínio `eixoverde.com` (registro `TXT` no DNS da Cloudflare).
+2. No **Google Auth Platform → Branding**, preencha o nome do app (**EixoVerde**), envie o logo ([`public/icons/icon-512.png`](../public/icons/icon-512.png)), página inicial `https://eixoverde.com`, política de privacidade `https://eixoverde.com/privacidade.html` e domínio autorizado `eixoverde.com`.
+3. Clique em **Verificar marca** (ou abra **Central de verificação** no menu lateral) e envie para verificação. Como o EixoVerde usa apenas escopos básicos (`email`, `profile`, `openid`), a verificação de marca é gratuita e rápida — após aprovada, a tela passa a exibir **EixoVerde** e seu ícone oficial.
+   *(Para trocar também o subdomínio técnico de callback no detalhe interno da tela do Google, o Supabase oferece o add-on pago Custom Domain `auth.eixoverde.com` no plano Pro, mas ele não é obrigatório.)*
 
 ### MapTiler Cloud (Estilos Claro/Escuro/Satélite)
 Em [https://cloud.maptiler.com/](https://cloud.maptiler.com/) → **Account → Keys → Allowed HTTP Origins**, adicione (uma por linha):
