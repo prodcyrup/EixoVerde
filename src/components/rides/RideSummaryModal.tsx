@@ -95,7 +95,7 @@ export function RideSummaryModal() {
                   id="eixoverde-ride-summary-title"
                   className="font-display text-base font-extrabold text-slate-900 dark:text-white"
                 >
-                  Resumo do Pedal
+                  Resumo do Trajeto
                 </h2>
                 {pending.isDemo ? (
                   <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-extrabold text-amber-700 dark:text-amber-300">
@@ -103,7 +103,7 @@ export function RideSummaryModal() {
                   </span>
                 ) : pending.mode === 'free_ride' ? (
                   <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-extrabold text-sky-700 dark:text-sky-300">
-                    Pedal Livre
+                    Modo Livre
                   </span>
                 ) : (
                   <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300">
@@ -122,7 +122,7 @@ export function RideSummaryModal() {
           <button
             type="button"
             onClick={discardPendingRideSummary}
-            aria-label="Fechar resumo do pedal"
+            aria-label="Fechar resumo do trajeto"
             className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <X className="h-5 w-5" />
@@ -191,7 +191,7 @@ export function RideSummaryModal() {
               htmlFor="eixoverde-ride-title-input"
               className="mb-1 block text-xs font-bold text-slate-700 dark:text-slate-200"
             >
-              Nome do pedal
+              Nome do trajeto
             </label>
             <input
               id="eixoverde-ride-title-input"
@@ -290,7 +290,7 @@ export function RideSummaryModal() {
 
           {pending.isDemo && (
             <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-[11px] font-medium text-amber-800 dark:text-amber-300">
-              Pedais em modo <strong>Simulação</strong> ficam marcados no histórico e não alteram seus totais reais nem a calibração de bateria.
+              Trajetos em modo <strong>Simulação</strong> ficam marcados no histórico e não alteram seus totais reais nem a calibração de bateria.
             </p>
           )}
 
@@ -311,7 +311,7 @@ export function RideSummaryModal() {
               disabled={saving}
               className="flex-1 rounded-2xl bg-emerald-600 py-2.5 text-xs font-extrabold text-white shadow-lg shadow-emerald-600/25 transition-colors hover:bg-emerald-500 disabled:opacity-60"
             >
-              Salvar Pedal
+              Salvar Trajeto
             </button>
             <button
               type="button"
@@ -319,7 +319,7 @@ export function RideSummaryModal() {
               onClick={() => void handleSaveAndOpenHistory()}
               className="rounded-2xl border border-emerald-600/30 bg-emerald-500/10 px-3 py-2.5 text-xs font-extrabold text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-300"
             >
-              Ver Pedais
+              Ver Trajetos
             </button>
           </div>
         </form>

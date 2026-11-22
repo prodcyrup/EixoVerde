@@ -20,15 +20,16 @@ Siga este guia rápido (cerca de 5 minutos) para ativar **Contas na Nuvem**, **S
 1. No painel do Supabase, abra **SQL Editor** → **New query**.
 2. Copie todo o conteúdo do arquivo [`supabase/migrations/20261121000001_eixoverde_phase2.sql`](../supabase/migrations/20261121000001_eixoverde_phase2.sql) e cole no editor.
 3. Clique em **Run**.
-4. *(Fase 3 — Histórico de Pedais na Nuvem)* Repita os passos 1–3 com o arquivo [`supabase/migrations/20261121000002_eixoverde_phase3_rides.sql`](../supabase/migrations/20261121000002_eixoverde_phase3_rides.sql) para sincronizar o histórico **Meus Pedais** (`ride_sessions` com PostGIS `LineString` + RLS privado). Caso ainda não tenha rodado esta migração, o app salva seus pedais normalmente em IndexedDB e sincroniza automaticamente assim que a tabela existir.
+4. *(Fase 3 — Histórico de Trajetos na Nuvem)* Repita os passos 1–3 com o arquivo [`supabase/migrations/20261121000002_eixoverde_phase3_rides.sql`](../supabase/migrations/20261121000002_eixoverde_phase3_rides.sql) para sincronizar o histórico **Meus Trajetos** (`ride_sessions` com PostGIS `LineString` + RLS privado). Caso ainda não tenha rodado esta migração, o app salva seus trajetos normalmente em IndexedDB e sincroniza automaticamente assim que a tabela existir.
 5. *(Fase 4 — Comunidade DF, Avaliações 1–5★ & Alertas Realtime)* Repita os passos 1–3 com o arquivo [`supabase/migrations/20261121000003_eixoverde_phase4_community.sql`](../supabase/migrations/20261121000003_eixoverde_phase4_community.sql) para habilitar **Rotas da Comunidade DF** (`community_routes` com PostGIS `LineString` + leitura pública / escrita do autor), **Avaliações 1–5★ com tags de segurança** (`route_ratings` + trigger de média automática) e **Supabase Realtime** em `hazard_reports`.
 6. *(Fase 5 — Exclusão de Conta In-App para Google Play Store & Apple App Store)* Repita os passos 1–3 com o arquivo [`supabase/migrations/20261121000004_eixoverde_phase5_account_delete.sql`](../supabase/migrations/20261121000004_eixoverde_phase5_account_delete.sql) para criar a função RPC `public.delete_my_account()` (`SECURITY DEFINER`), permitindo que usuários autenticados excluam permanentemente sua conta e dados na nuvem diretamente dentro do aplicativo.
+7. *(Fase 7 — EixoVerde VIP Vitalício na Nuvem)* Repita os passos 1–3 com o arquivo [`supabase/migrations/20261121000005_eixoverde_phase7_vip.sql`](../supabase/migrations/20261121000005_eixoverde_phase7_vip.sql) para adicionar as colunas `is_premium` / `premium_sku` em `public.profiles` e criar a função RPC `public.activate_vip_entitlement(...)`, sincronizando compras VIP entre aparelhos.
 
 O script é **100% idempotente** (pode ser executado novamente sem erro) e cria automaticamente:
 - Extensão **PostGIS** no schema `extensions` (compatível com Supabase Cloud).
 - Tabelas com **Row Level Security (RLS)** habilitado: `profiles`, `saved_routes`, `saved_places`, `custom_vehicles`, `hazard_reports`, `hazard_confirmations`, `ride_sessions`, `community_routes`, `route_ratings` e `user_preferences`.
 - Triggers automáticos de geometria (`LineString` e `Point` SRID 4326), contagem de confirmações de alertas, média de avaliações da comunidade e criação de perfil no cadastro.
-- Funções espaciais RPC `get_hazards_in_bounds(...)` (com índice GIST), `confirm_hazard(...)` e `delete_my_account()`.
+- Funções espaciais RPC `get_hazards_in_bounds(...)` (com índice GIST), `confirm_hazard(...)`, `delete_my_account()` e `activate_vip_entitlement(...)`.
 - Publicação `supabase_realtime` para atualizações ao vivo de `hazard_reports`.
 
 ---
@@ -107,6 +108,7 @@ Clique em **New repository secret** e cadastre:
 | `VITE_SUPABASE_ANON_KEY` | Chave `sb_publishable_...` **ou** `anon` JWT (`eyJ...`) | Sim (para Fase 2) |
 | `VITE_MAPTILER_KEY` | Chave do MapTiler Cloud (estilos Light/Dark/Satélite) | Opcional |
 | `VITE_ORS_KEY` | Chave direta OpenRouteService (pode ser removida após ativar o `ors-proxy`) | Opcional |
+| `VITE_ADMOB_ANDROID_BANNER_ID` | ID do bloco de anúncio Banner do Google AdMob Android | Opcional (Fase 7) |
 
 ---
 
@@ -116,7 +118,7 @@ Clique em **New repository secret** e cadastre:
 2. Aguarde a conclusão do deploy e abra [https://prodcyrup.github.io/EixoVerde/](https://prodcyrup.github.io/EixoVerde/).
 3. Abra o menu lateral (**☰**) e verifique:
    - O card de **Conta & Sincronização** exibe o botão **Entrar ou Criar Conta** (e, após login, o status de sincronização em nuvem).
-   - Na seção **Motores Ativos**, o roteamento exibe **OpenRouteService (Proxy)** quando o `ors-proxy` estiver publicado.
+   - O card **EixoVerde VIP** permite ativar e restaurar o benefício vitalício sincronizado com a conta.
 
 ### Desenvolvimento Local (`.env.local`)
 

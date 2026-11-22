@@ -41,6 +41,9 @@ const PrivacyPolicyModal = lazy(() =>
 const CitySelectorModal = lazy(() =>
   import('./components/city/CitySelectorModal').then((m) => ({ default: m.CitySelectorModal }))
 );
+const PremiumModal = lazy(() =>
+  import('./components/monetization/PremiumModal').then((m) => ({ default: m.PremiumModal }))
+);
 
 export function App() {
   const bootstrap = useAppStore((s) => s.bootstrap);
@@ -49,6 +52,7 @@ export function App() {
   const garageOpen = useAppStore((s) => s.garageOpen);
   const compareOpen = useAppStore((s) => s.compareOpen);
   const cityModalOpen = useAppStore((s) => s.cityModalOpen);
+  const vipModalOpen = useAppStore((s) => s.vipModalOpen);
   const hazardPickerOpen = useAppStore((s) => s.hazardPickerOpen);
   const pendingSavePlace = useAppStore((s) => s.pendingSavePlace);
   const mapContextPin = useAppStore((s) => s.mapContextPin);
@@ -80,6 +84,7 @@ export function App() {
         {mode !== 'navigate' && mapContextPin && <MapContextPopup />}
         {menuOpen && <AppMenuDrawer />}
         {cityModalOpen && <CitySelectorModal />}
+        {vipModalOpen && <PremiumModal />}
         {garageOpen && <VehicleGarageModal />}
         {compareOpen && <CompareBuyModal />}
         {hazardPickerOpen && <HazardReportModal />}

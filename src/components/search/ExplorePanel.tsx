@@ -33,16 +33,15 @@ import type {
   SavedPlaceCategory,
   SavedRoute,
 } from '../../types';
+import {
+  SAFETY_TAG_CATALOG,
+  filterTagsForStars,
+  getSafetyPromptForStars,
+  getSafetyTagLabel,
+  getSafetyTagsForStars,
+} from '../../engine/ratingTags';
+import { AdBanner } from '../monetization/AdBanner';
 import { RidesHistoryPanel } from '../rides/RidesHistoryPanel';
-
-const SAFETY_TAG_OPTIONS: Array<{ id: RouteSafetyTag; label: string }> = [
-  { id: 'bom_asfalto', label: 'Bom asfalto' },
-  { id: 'iluminada', label: 'Iluminada' },
-  { id: 'sombra', label: 'Sombra' },
-  { id: 'paisagem', label: 'Paisagem' },
-  { id: 'cruzamento_tenso', label: 'Cruzamento tenso' },
-  { id: 'muito_movimento', label: 'Muito movimento' },
-];
 
 export function ExplorePanel() {
   const [query, setQuery] = useState('');
@@ -167,9 +166,15 @@ export function ExplorePanel() {
       return;
     }
     const existing = routeRatings[routeId];
+    const initialStars = existing?.userRating ?? Math.max(1, Math.round(existing?.avgRating || 5));
     setRatingCardKey(cardKey);
-    setDraftStars(existing?.userRating ?? Math.max(1, Math.round(existing?.avgRating || 5)));
-    setDraftTags(existing?.userTags ?? []);
+    setDraftStars(initialStars);
+    setDraftTags(filterTagsForStars(existing?.userTags ?? [], initialStars));
+  };
+
+  const handleSelectDraftStar = (star: number) => {
+    setDraftStars(star);
+    setDraftTags((prev) => filterTagsForStars(prev, star));
   };
 
   const toggleDraftTag = (tag: RouteSafetyTag) => {
@@ -302,13 +307,18 @@ export function ExplorePanel() {
             {displayTags.length > 0 && !isRenaming && (
               <div className="mt-1.5 flex flex-wrap gap-1">
                 {displayTags.slice(0, 3).map((tagId) => {
-                  const found = SAFETY_TAG_OPTIONS.find((t) => t.id === tagId);
+                  const meta = SAFETY_TAG_CATALOG[tagId as RouteSafetyTag];
+                  const isNeg = meta?.sentiment === 'negative';
                   return (
                     <span
                       key={tagId}
-                      className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-700/80 dark:text-slate-300"
+                      className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
+                        isNeg
+                          ? 'bg-rose-500/12 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300'
+                          : 'bg-slate-100 text-slate-600 dark:bg-slate-700/80 dark:text-slate-300'
+                      }`}
                     >
-                      {found?.label || tagId}
+                      {getSafetyTagLabel(tagId)}
                     </span>
                   );
                 })}
@@ -422,24 +432,25 @@ export function ExplorePanel() {
           </div>
         </div>
 
-        {/* Inline 1-5★ Star Rating & Safety Tags Picker */}
+        {/* Inline 1-5★ Adaptive Star Rating & Safety Tags Picker */}
         {isRatingOpen && (
           <div
+            data-rating-editor={route.id}
             onClick={(e) => e.stopPropagation()}
             className="mt-2.5 space-y-2 rounded-xl border border-amber-500/30 bg-amber-50/60 p-2.5 dark:bg-slate-900/80"
           >
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <span className="text-[11px] font-extrabold text-slate-800 dark:text-slate-100">
-                Avaliar segurança desta rota
+                {getSafetyPromptForStars(draftStars)}
               </span>
-              <div className="flex items-center gap-0.5">
+              <div className="flex shrink-0 items-center gap-0.5">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
                     key={star}
                     type="button"
                     aria-label={`${star} estrelas`}
                     data-star-value={star}
-                    onClick={() => setDraftStars(star)}
+                    onClick={() => handleSelectDraftStar(star)}
                     className="p-0.5"
                   >
                     <Star
@@ -453,17 +464,24 @@ export function ExplorePanel() {
             </div>
 
             <div className="flex flex-wrap gap-1">
-              {SAFETY_TAG_OPTIONS.map((tag) => {
+              {getSafetyTagsForStars(draftStars).map((tag) => {
                 const selected = draftTags.includes(tag.id);
+                const isNegative = tag.sentiment === 'negative';
                 return (
                   <button
                     key={tag.id}
                     type="button"
+                    data-safety-tag={tag.id}
+                    data-tag-sentiment={tag.sentiment}
                     onClick={() => toggleDraftTag(tag.id)}
                     className={`rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors ${
                       selected
-                        ? 'bg-emerald-600 text-white'
-                        : 'border border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                        ? isNegative
+                          ? 'bg-rose-600 text-white'
+                          : 'bg-emerald-600 text-white'
+                        : isNegative
+                          ? 'border border-rose-200/80 bg-white text-slate-600 hover:border-rose-400 dark:border-rose-900/60 dark:bg-slate-800 dark:text-slate-300'
+                          : 'border border-slate-200 bg-white text-slate-600 hover:border-emerald-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
                     }`}
                   >
                     {tag.label}
@@ -648,7 +666,7 @@ export function ExplorePanel() {
           className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full border border-emerald-600/30 bg-emerald-600/10 px-2 py-1.5 text-[11px] font-bold text-emerald-700 transition-colors hover:bg-emerald-600 hover:text-white dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-300"
         >
           <Play className="h-3 w-3 shrink-0 fill-current" />
-          Pedal Livre
+          Modo Livre
         </button>
         <button
           type="button"
@@ -676,7 +694,7 @@ export function ExplorePanel() {
         </button>
       </div>
 
-      {/* Primary Segmented Switch: Rotas | Meus Locais | Pedais */}
+      {/* Primary Segmented Switch: Rotas | Meus Locais | Trajetos */}
       <div className="grid grid-cols-3 rounded-xl bg-slate-100 p-1 dark:bg-slate-800/90">
         <button
           type="button"
@@ -713,11 +731,11 @@ export function ExplorePanel() {
           }`}
         >
           <Activity className="h-3.5 w-3.5 shrink-0" />
-          Pedais ({rideSessions.length})
+          Trajetos ({rideSessions.length})
         </button>
       </div>
 
-      {/* TAB 1: ROTAS (Saved Routes, Comunidade DF, Brasília Curated Routes) */}
+      {/* TAB 1: ROTAS (Saved Routes, Comunidade, Active Capital Curated Routes) */}
       {exploreTab === 'rides' ? (
         <RidesHistoryPanel />
       ) : exploreTab === 'routes' ? (
@@ -760,11 +778,14 @@ export function ExplorePanel() {
             ) : (
               <div className="rounded-2xl border border-dashed border-slate-200 px-3.5 py-3 text-center dark:border-slate-700/80">
                 <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                  Salve uma rota e toque no ícone <Globe className="inline h-3 w-3 text-emerald-600" /> para compartilhar com ciclistas do DF.
+                  Salve uma rota e toque no ícone <Globe className="inline h-3 w-3 text-emerald-600" /> para compartilhar com a comunidade.
                 </p>
               </div>
             )}
           </div>
+
+          {/* Phase 7: Compact Ad Banner (Free tier only, hidden during live nav & for VIP) */}
+          <AdBanner placement="explore" />
 
           {/* Rotas na Capital Ativa (Bottom) + Seletor 27 Capitais */}
           <div className="space-y-2">

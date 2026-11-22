@@ -79,8 +79,8 @@ export function createRideRecording(params: {
   const defaultTitle =
     params.title?.trim() ||
     (params.mode === 'free_ride'
-      ? `Pedal Livre • ${dateLabel} ${timeLabel}`
-      : `Pedal • ${dateLabel} ${timeLabel}`);
+      ? `Modo Livre • ${dateLabel} ${timeLabel}`
+      : `Trajeto • ${dateLabel} ${timeLabel}`);
 
   const initialTrack: RideTrackPoint[] = params.initialPos
     ? [
@@ -424,7 +424,7 @@ export function rideSessionToSavedRoute(ride: RideSession): SavedRoute | null {
     id: `route-from-${ride.id}`,
     name: ride.title,
     description: `Gravada com ${ride.vehicleName} • ${ride.distanceKm.toFixed(1).replace('.', ',')} km`,
-    tag: `Pedal Gravado • ${surf.safetyScore}% segura`,
+    tag: `Trajeto Gravado • ${surf.safetyScore}% segura`,
     createdAt: nowIso,
     updatedAt: nowIso,
     isFavorite: true,
@@ -451,6 +451,6 @@ export function exportRideToGpx(ride: RideSession): string {
   const coords: Coord3D[] = ride.track.map((pt) =>
     typeof pt.ele === 'number' ? [pt.lng, pt.lat, pt.ele] : [pt.lng, pt.lat]
   );
-  const desc = `Pedal EixoVerde • ${ride.vehicleName} • ${ride.distanceKm.toFixed(2)} km • Média ${ride.avgSpeedKmh} km/h`;
+  const desc = `Trajeto EixoVerde • ${ride.vehicleName} • ${ride.distanceKm.toFixed(2)} km • Média ${ride.avgSpeedKmh} km/h`;
   return exportRouteToGpx(ride.title, coords, desc);
 }

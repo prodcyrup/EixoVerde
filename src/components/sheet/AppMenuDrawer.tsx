@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   Cloud,
   CloudOff,
+  Crown,
   Download,
   Globe2,
   HardDrive,
@@ -27,8 +28,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { BRAND } from '../../config/brand';
-import { hasMapTilerKey, hasOrsKey, hasSupabaseConfig } from '../../config/providers';
-import { isOrsProxyCircuitOpen } from '../../engine/routing';
+import { hasSupabaseConfig } from '../../config/providers';
+import { VIP_PRICE_LABEL } from '../../mobile/monetizationBridge';
 import { selectActiveCapital, selectActiveVehicle, useAppStore } from '../../store/useAppStore';
 
 export function AppMenuDrawer() {
@@ -39,6 +40,7 @@ export function AppMenuDrawer() {
   const setAuthModalOpen = useAppStore((s) => s.setAuthModalOpen);
   const setPrivacyModalOpen = useAppStore((s) => s.setPrivacyModalOpen);
   const setCityModalOpen = useAppStore((s) => s.setCityModalOpen);
+  const setVipModalOpen = useAppStore((s) => s.setVipModalOpen);
   const setExploreTab = useAppStore((s) => s.setExploreTab);
   const clearActiveRoute = useAppStore((s) => s.clearActiveRoute);
   const theme = useAppStore((s) => s.theme);
@@ -66,11 +68,11 @@ export function AppMenuDrawer() {
   const signOut = useAppStore((s) => s.signOut);
   const deleteAccount = useAppStore((s) => s.deleteAccount);
   const deleteAccountLoading = useAppStore((s) => s.deleteAccountLoading);
+  const isPremium = useAppStore((s) => s.isPremium);
 
   const offlineCache = useAppStore((s) => s.offlineCache);
   const offlineCacheLoading = useAppStore((s) => s.offlineCacheLoading);
   const warmOfflineCache = useAppStore((s) => s.warmOfflineCache);
-  const realtimeConnected = useAppStore((s) => s.realtimeConnected);
 
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [wipeLocalOnDelete, setWipeLocalOnDelete] = useState(false);
@@ -78,12 +80,11 @@ export function AppMenuDrawer() {
   if (!open) return null;
 
   const supabaseEnabled = hasSupabaseConfig();
-  const orsProxyFallback = isOrsProxyCircuitOpen();
   const locationParts = [currentLocationPlace?.district, currentLocationPlace?.city].filter(Boolean);
   const locationLabel =
     locationParts.length > 0
       ? locationParts.join(', ')
-      : currentLocationPlace?.city || 'Brasília, DF';
+      : currentLocationPlace?.city || activeCapital.label;
   const versionSubtitle = `${locationLabel} • v${__APP_VERSION__}`;
 
   const getSyncBadgeMeta = () => {
@@ -124,14 +125,6 @@ export function AppMenuDrawer() {
   };
 
   const badgeMeta = getSyncBadgeMeta();
-
-  const routingEngineLabel = supabaseEnabled
-    ? orsProxyFallback
-      ? 'BRouter / OSRM (Fallback)'
-      : 'ORS Edge Proxy'
-    : hasOrsKey()
-      ? 'OpenRouteService'
-      : 'BRouter / OSRM';
 
   return (
     <div className="fixed inset-0 z-50 flex bg-slate-950/55 backdrop-blur-xs" onClick={() => setMenuOpen(false)}>
@@ -345,6 +338,40 @@ export function AppMenuDrawer() {
             )}
           </div>
 
+          {/* Phase 7: EixoVerde VIP Lifetime Card (R$ 9,90) */}
+          <button
+            id="eixoverde-menu-vip-btn"
+            type="button"
+            onClick={() => {
+              setMenuOpen(false);
+              setVipModalOpen(true);
+            }}
+            className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition-all ${
+              isPremium
+                ? 'border-amber-400/50 bg-gradient-to-r from-amber-500/15 to-emerald-500/10 dark:border-amber-500/40'
+                : 'border-amber-500/35 bg-gradient-to-r from-amber-500/12 via-amber-500/5 to-transparent hover:border-amber-500/60'
+            }`}
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400">
+              <Crown className="h-5 w-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-extrabold text-slate-900 dark:text-white">
+                  {isPremium ? 'EixoVerde VIP Ativo' : 'EixoVerde VIP'}
+                </span>
+                <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] font-extrabold text-slate-950">
+                  {isPremium ? 'VITALÍCIO' : VIP_PRICE_LABEL}
+                </span>
+              </div>
+              <div className="truncate text-[11px] text-slate-500 dark:text-slate-400">
+                {isPremium
+                  ? 'Zero anúncios • 27 capitais offline'
+                  : 'Zero anúncios + 27 capitais offline • pagamento único'}
+              </div>
+            </div>
+          </button>
+
           <div className="space-y-1.5">
             <button
               type="button"
@@ -421,7 +448,7 @@ export function AppMenuDrawer() {
               className="flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               <Activity className="h-4.5 w-4.5 text-emerald-500" />
-              <span className="flex-1 text-sm font-semibold">Meus Pedais</span>
+              <span className="flex-1 text-sm font-semibold">Meus Trajetos</span>
               <span className="font-mono-num rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                 {rideSessions.length}
               </span>
@@ -472,7 +499,7 @@ export function AppMenuDrawer() {
               >
                 <span className="inline-flex items-center gap-2.5">
                   <Layers className="h-4 w-4 text-emerald-600" />
-                  Malha de Ciclovias DF
+                  Malha de Ciclovias {activeCapital.stateCode}
                 </span>
                 <span className={`h-5 w-9 rounded-full p-0.5 transition-colors ${showBikeLanes ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700'}`}>
                   <span className={`block h-4 w-4 rounded-full bg-white transition-transform ${showBikeLanes ? 'translate-x-4' : ''}`} />
@@ -550,7 +577,7 @@ export function AppMenuDrawer() {
             </div>
           </div>
 
-          {/* Phase 4: 1-Tap Offline DF Cache Card */}
+          {/* 1-Tap Offline Capital Cache Card */}
           <div
             id="eixoverde-offline-cache-card"
             className="rounded-2xl border border-slate-200/80 bg-slate-50/90 p-3.5 dark:border-slate-800 dark:bg-slate-800/60"
@@ -558,7 +585,9 @@ export function AppMenuDrawer() {
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <HardDrive className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                <span className="text-xs font-extrabold text-slate-900 dark:text-white">Cache Offline DF</span>
+                <span className="text-xs font-extrabold text-slate-900 dark:text-white">
+                  Cache Offline {activeCapital.stateCode}
+                </span>
               </div>
               <span
                 className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
@@ -571,7 +600,7 @@ export function AppMenuDrawer() {
               </span>
             </div>
             <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-              Salva a malha cicloviária do DF, estações Tembici &amp; JET e bicicletários para pedalar sem internet.
+              Salva a malha cicloviária de {activeCapital.name}, estações e bicicletários para circular sem internet.
             </p>
             <button
               id="eixoverde-warm-offline-btn"
@@ -583,46 +612,17 @@ export function AppMenuDrawer() {
               {offlineCacheLoading ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Salvando dados do DF...
+                  Salvando dados de {activeCapital.name}...
                 </>
               ) : (
                 <>
                   <Download className="h-3.5 w-3.5" />
-                  {offlineCache.ready ? 'Atualizar Cache DF' : 'Baixar Mapa Offline DF'}
+                  {offlineCache.ready
+                    ? `Atualizar Cache ${activeCapital.stateCode}`
+                    : `Baixar Mapa Offline ${activeCapital.stateCode}`}
                 </>
               )}
             </button>
-          </div>
-
-          {/* Engine & Cloud Status */}
-          <div className="space-y-2 rounded-2xl bg-slate-100/80 p-3.5 text-xs dark:bg-slate-800/60">
-            <div className="font-bold text-slate-700 dark:text-slate-200">Motores Ativos</div>
-            <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-              <span>Mapa Vetorial</span>
-              <span className="font-semibold text-emerald-700 dark:text-emerald-400">
-                {hasMapTilerKey() ? 'MapTiler Cloud' : 'OpenFreeMap'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-              <span>Roteamento Seguro</span>
-              <span className="font-semibold text-emerald-700 dark:text-emerald-400">
-                {routingEngineLabel}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-              <span>Clima &amp; Vento</span>
-              <span className="font-semibold text-emerald-700 dark:text-emerald-400">Open-Meteo Live</span>
-            </div>
-            <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-              <span>Sincronização</span>
-              <span className="font-semibold text-emerald-700 dark:text-emerald-400">
-                {supabaseEnabled
-                  ? realtimeConnected
-                    ? 'Supabase Realtime + Offline'
-                    : 'Supabase Cloud + Offline'
-                  : 'IndexedDB Offline-First'}
-              </span>
-            </div>
           </div>
         </div>
       </aside>

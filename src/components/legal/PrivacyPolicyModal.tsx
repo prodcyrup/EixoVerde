@@ -52,7 +52,7 @@ export function PrivacyPolicyModal() {
               Compromisso de Privacidade (Lei nº 13.709/2018 — LGPD)
             </div>
             <p className="mt-1 text-[11px] opacity-90">
-              O {BRAND.name} funciona de forma 100% completa sem exigir cadastro obrigatório. Seus dados não são vendidos, alugados ou compartilhados com redes de anúncios ou corretores de dados.
+              O {BRAND.name} funciona de forma completa sem exigir cadastro obrigatório. Não vendemos, alugamos ou comercializamos seus dados pessoais com corretores de dados.
             </p>
           </div>
 
@@ -62,28 +62,31 @@ export function PrivacyPolicyModal() {
               1. Uso de Localização (GPS em Primeiro Plano)
             </h3>
             <p>
-              Quando você autoriza o acesso à localização ou inicia uma navegação/pedal livre, o {BRAND.name} utiliza o GPS exclusivamente para:
+              Quando você autoriza o acesso à localização ou inicia uma navegação/modo livre, o {BRAND.name} utiliza o GPS exclusivamente para:
             </p>
             <ul className="list-disc space-y-1 pl-5">
               <li>Centralizar o mapa na sua posição atual e calcular rotas em ciclovias e vias seguras;</li>
-              <li>Guiar curva a curva em tempo real, registrar telemetria de pedais iniciados por você e posicionar alertas comunitários de obstáculos.</li>
+              <li>Guiar curva a curva em tempo real, registrar telemetria de trajetos iniciados por você e posicionar alertas comunitários de obstáculos.</li>
             </ul>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              O aplicativo não rastreia sua localização oculta quando você não está utilizando o mapa ou gravando um pedal ativo.
+              O aplicativo não rastreia sua localização oculta quando você não está utilizando o mapa ou gravando um trajeto ativo.
             </p>
           </section>
 
           <section className="space-y-1.5">
             <h3 className="flex items-center gap-1.5 text-xs font-extrabold text-slate-900 dark:text-white">
               <Lock className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-              2. Armazenamento Local vs. Conta EixoVerde Cloud
+              2. Armazenamento Local, Conta Cloud &amp; Anúncios
             </h3>
             <ul className="list-disc space-y-1 pl-5">
               <li>
-                <strong>Modo Local (Offline-First):</strong> Rotas, locais favoritos, veículos da garagem e histórico de pedais ficam armazenados diretamente no seu dispositivo (IndexedDB).
+                <strong>Modo Local (Offline-First):</strong> Rotas, locais favoritos, veículos da garagem e histórico de trajetos ficam armazenados diretamente no seu dispositivo (IndexedDB).
               </li>
               <li>
-                <strong>Conta Cloud (Opcional):</strong> Caso você opte por criar uma conta com e-mail ou login social, sincronizamos de forma criptografada (HTTPS/TLS + Row-Level Security) seu perfil básico, veículos, locais salvos, rotas, avaliações comunitárias e histórico de pedais entre seus aparelhos.
+                <strong>Conta Cloud (Opcional):</strong> Caso você opte por criar uma conta com e-mail ou login social, sincronizamos de forma criptografada (HTTPS/TLS + Row-Level Security) seu perfil básico, veículos, locais salvos, rotas, avaliações comunitárias e histórico de trajetos entre seus aparelhos.
+              </li>
+              <li>
+                <strong>Anúncios e EixoVerde VIP:</strong> Na versão gratuita, um banner compacto pode ser exibido fora da navegação ativa (Google AdMob no app nativo). O desbloqueio EixoVerde VIP remove todos os anúncios permanentemente.
               </li>
             </ul>
           </section>

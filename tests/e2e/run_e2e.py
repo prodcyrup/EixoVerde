@@ -233,9 +233,13 @@ def run_e2e() -> int:
             menu_text = page.locator("aside").last.inner_text()
             sync_badge_guest = page.locator("#eixoverde-sync-status").inner_text()
             check(
-                "Desktop menu displays v1.0.0, Modo Local & no third-party nav brands",
+                "Desktop menu displays v1.0.0, Modo Local, Meus Trajetos, VIP R$ 9,90 & no Motores Ativos / third-party brands",
                 "v1.0.0" in menu_text
                 and "Modo Local" in sync_badge_guest
+                and "Meus Trajetos" in menu_text
+                and "EixoVerde VIP" in menu_text
+                and "R$ 9,90" in menu_text
+                and "Motores Ativos" not in menu_text
                 and "Waze" not in menu_text
                 and "Komoot" not in menu_text
                 and not page.locator("#eixoverde-auth-open-btn").is_visible(),
@@ -366,12 +370,40 @@ def run_e2e() -> int:
                 "Noroeste (Burle Marx)" in rotas_text and "Lago Sul: Ponte JK" in rotas_text and "Asa Sul (SQS 114)" in rotas_text,
             )
 
-            # Rate first curated DF route with 5★ + "Bom asfalto" tag (must open ONLY 1 inline drawer even when favorited)
+            # Rate first curated DF route with adaptive 1-5★ tags (5★=only positive, 1★=only negative, 3★=mixed)
             first_rate_btn = page.locator("aside button[data-rate-route]").first
             first_rate_btn.click()
             time.sleep(0.2)
             open_rating_drawers = page.locator("aside button[data-submit-rating]").count()
-            page.locator("aside button:has-text('Bom asfalto')").first.click()
+            editor = page.locator("aside [data-rating-editor]").first
+            tags_5_txt = editor.inner_text()
+            ok_5_star = (
+                "Bem sinalizada" in tags_5_txt
+                and "Bom asfalto" in tags_5_txt
+                and "Cruzamento tenso" not in tags_5_txt
+                and "Asfalto ruim / buracos" not in tags_5_txt
+            )
+            editor.locator("button[data-star-value='1']").click()
+            time.sleep(0.15)
+            tags_1_txt = editor.inner_text()
+            ok_1_star = (
+                "Asfalto ruim / buracos" in tags_1_txt
+                and "Sensação insegura" in tags_1_txt
+                and "Bom asfalto" not in tags_1_txt
+                and "Bem sinalizada" not in tags_1_txt
+            )
+            editor.locator("button[data-star-value='3']").click()
+            time.sleep(0.15)
+            tags_3_txt = editor.inner_text()
+            ok_3_star = "Bom asfalto" in tags_3_txt and "Cruzamento tenso" in tags_3_txt
+            check(
+                "Phase 7 Adaptive 1-5★ rating tags switch cleanly (5★ positive, 3★ mixed, 1★ negative)",
+                ok_5_star and ok_3_star and ok_1_star,
+                f"5★={ok_5_star}, 3★={ok_3_star}, 1★={ok_1_star}",
+            )
+            editor.locator("button[data-star-value='5']").click()
+            time.sleep(0.15)
+            editor.locator("button[data-safety-tag='bom_asfalto']").click()
             page.locator("aside button[data-submit-rating]").first.click()
             time.sleep(0.35)
             check(
@@ -425,10 +457,14 @@ def run_e2e() -> int:
             page.locator("aside button:has-text('Ida + Volta')").click()
             time.sleep(0.2)
 
-            # 1f. Demo Navigation + 2D/3D toggle + Hazard Modal dark contrast + RideSummaryModal
+            # 1f. Demo Navigation + Zero Ads During Nav + 2D/3D toggle + Hazard Modal dark contrast + RideSummaryModal
             page.locator("aside #eixoverde-demo-nav-btn").click()
             page.wait_for_selector("button:has-text('Sair')", timeout=8000)
             time.sleep(1.1)
+            check(
+                "Phase 7 Ad Banner is NEVER rendered during active 3D navigation",
+                page.locator("[data-ad-banner='true']").count() == 0,
+            )
             page.locator("button:has-text('3D')").click()
             time.sleep(0.3)
             check("Demo Navigation launches & toggles 3D -> 2D", page.locator("button:has-text('2D')").is_visible())
@@ -448,24 +484,32 @@ def run_e2e() -> int:
             ride_title_in.click()
             rt_c = ride_title_in.evaluate("el => ({ color: getComputedStyle(el).color, bg: getComputedStyle(el).backgroundColor })")
             check(
-                "Exiting Demo Navigation opens RideSummaryModal with Simulação badge & crisp dark input",
-                "Simulação" in sum_txt and rt_c["bg"] != "rgb(255, 255, 255)",
+                "Exiting Demo Navigation opens RideSummaryModal ('Resumo do Trajeto') with Simulação badge & crisp dark input",
+                "Resumo do Trajeto" in sum_txt and "Simulação" in sum_txt and rt_c["bg"] != "rgb(255, 255, 255)",
                 json.dumps(rt_c),
             )
             save_shot(page, "e2e_phase3_ride_summary_dark.png")
             page.click("#eixoverde-ride-save-btn")
             time.sleep(0.4)
 
-            # 1f-2. Meus Pedais history tab + SVG Replay Chart + Free Ride HUD (Pause/Resume/Finish)
+            # 1f-2. Meus Trajetos history tab + SVG Replay Chart + Modo Livre HUD (Pause/Resume/Finish)
             page.locator("aside button[aria-label='Voltar']").click()
             time.sleep(0.3)
+            check(
+                "Phase 7 inclusive multimodal labels render ('Modo Livre' & 'Trajetos')",
+                "Modo Livre" in page.locator("aside #eixoverde-freeride-chip").inner_text()
+                and "Trajetos" in page.locator("aside #eixoverde-tab-rides").inner_text(),
+            )
             page.click("aside #eixoverde-tab-rides")
             page.wait_for_selector("aside #eixoverde-rides-panel", timeout=6000)
             time.sleep(0.3)
             rides_txt = page.locator("aside #eixoverde-rides-panel").inner_text()
             check(
-                "Meus Pedais displays lifetime stats & saved Demo ride",
-                "resumo acumulado" in rides_txt.lower() and "Simulação" in rides_txt and "Esplanada" in rides_txt,
+                "Meus Trajetos displays lifetime stats & saved Demo ride",
+                "resumo acumulado" in rides_txt.lower()
+                and "histórico de trajetos" in rides_txt.lower()
+                and "Simulação" in rides_txt
+                and "Esplanada" in rides_txt,
             )
             page.locator("aside #eixoverde-rides-panel button:has-text('Replay')").first.click()
             time.sleep(0.4)
@@ -476,10 +520,11 @@ def run_e2e() -> int:
             )
             save_shot(page, "e2e_phase3_meus_pedais.png")
 
-            # Launch Free Ride ("Pedal Livre") HUD -> Pause -> Resume -> Finish
+            # Launch Free Ride ("Modo Livre") HUD -> Pause -> Resume -> Finish
             page.click("aside #eixoverde-start-freeride-btn")
             page.wait_for_selector("#eixoverde-freeride-hud", timeout=6000)
             time.sleep(0.3)
+            fr_hud_txt = page.locator("#eixoverde-freeride-hud").inner_text()
             page.click("#eixoverde-freeride-pause-btn")
             time.sleep(0.2)
             fr_paused = "Retomar" in page.locator("#eixoverde-freeride-pause-btn").inner_text()
@@ -490,8 +535,8 @@ def run_e2e() -> int:
                 page.click("#eixoverde-ride-discard-btn")
                 time.sleep(0.2)
             check(
-                "Free Ride ('Pedal Livre') HUD launches, toggles Pause/Retomar & finishes cleanly",
-                fr_paused and page.locator("aside #eixoverde-search-input").is_visible(),
+                "Free Ride ('Modo Livre') HUD launches, toggles Pause/Retomar & finishes cleanly",
+                "Modo Livre" in fr_hud_txt and fr_paused and page.locator("aside #eixoverde-search-input").is_visible(),
             )
 
             # 1g. Offline routing resilience test
@@ -536,6 +581,27 @@ def run_e2e() -> int:
             page.wait_for_selector("#eixoverde-city-modal", timeout=6000)
             page.click("#eixoverde-city-modal button[data-city-slug='brasilia']")
             time.sleep(0.3)
+
+            # 1i. Phase 7: Compact Ad Banner -> EixoVerde VIP (R$ 9,90) Lifetime Unlock -> Zero Ads
+            ad_explore = page.locator("#eixoverde-ad-banner-explore")
+            ad_visible_before = ad_explore.is_visible() and "R$ 9,90" in ad_explore.inner_text()
+            page.click("#eixoverde-ad-remove-btn-explore")
+            page.wait_for_selector("#eixoverde-vip-modal", timeout=6000)
+            vip_modal_txt = page.locator("#eixoverde-vip-modal").inner_text()
+            check(
+                "Phase 7 Compact Ad Banner opens EixoVerde VIP modal displaying R$ 9,90 lifetime launch price",
+                ad_visible_before
+                and "EixoVerde VIP" in vip_modal_txt
+                and "R$ 9,90" in vip_modal_txt
+                and "eixoverde_vip_lifetime" in vip_modal_txt,
+            )
+            page.click("#eixoverde-vip-purchase-btn")
+            time.sleep(0.35)
+            check(
+                "Phase 7 Activating EixoVerde VIP closes modal & removes Ad Banner immediately",
+                page.locator("#eixoverde-vip-modal").count() == 0
+                and page.locator("[data-ad-banner='true']").count() == 0,
+            )
 
             check("Zero Supabase requests emitted in zero-key Guest mode", len(supabase_requests_in_guest) == 0)
             check("Desktop Guest mode zero uncaught page errors", len(desktop_errors) == 0, "; ".join(desktop_errors))
@@ -1015,6 +1081,18 @@ def run_e2e() -> int:
                     route.fulfill(status=200, headers=cors, body="null")
                     return
 
+                if "/rest/v1/profiles" in url:
+                    route.fulfill(
+                        status=200,
+                        headers=cors,
+                        body=json.dumps({"is_premium": False, "premium_purchased_at": None}),
+                    )
+                    return
+
+                if "/rest/v1/rpc/activate_vip_entitlement" in url:
+                    route.fulfill(status=200, headers=cors, body="null")
+                    return
+
                 route.fulfill(status=200, headers=cors, body=json.dumps([]))
 
             cpage.route(f"{MOCK_SUPABASE_URL}/**", handle_supabase_mock)
@@ -1107,7 +1185,7 @@ def run_e2e() -> int:
             cpage.wait_for_selector("aside #eixoverde-rides-panel", timeout=6000)
             time.sleep(0.25)
             check(
-                "Bidirectional cloud sync pulls ride_sessions into Meus Pedais",
+                "Bidirectional cloud sync pulls ride_sessions into Meus Trajetos",
                 "Pedal Cloud Eixo Monumental" in cpage.locator("aside #eixoverde-rides-panel").inner_text(),
             )
             cpage.locator("aside button:has-text('Rotas')").first.click()

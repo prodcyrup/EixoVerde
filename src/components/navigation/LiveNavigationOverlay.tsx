@@ -120,7 +120,7 @@ export function LiveNavigationOverlay() {
   // Announce navigation start
   useEffect(() => {
     if (nav.isFreeRide) {
-      announceNavAlert('Gravação de pedal livre iniciada.', useAppStore.getState().voiceMode);
+      announceNavAlert('Gravação de modo livre iniciada.', useAppStore.getState().voiceMode);
       return;
     }
     if (!activeRoute) return;
@@ -455,7 +455,7 @@ export function LiveNavigationOverlay() {
   );
 
   // ==============================================================
-  // FREE RIDE ("PEDAL LIVRE") RECORDING HUD
+  // FREE RIDE ("MODO LIVRE") RECORDING HUD
   // ==============================================================
   if (nav.isFreeRide) {
     const rec = activeRide;
@@ -477,7 +477,7 @@ export function LiveNavigationOverlay() {
                 </span>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="truncate text-sm font-extrabold text-white">Pedal Livre</span>
+                    <span className="truncate text-sm font-extrabold text-white">Modo Livre</span>
                     <span
                       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
                         isPaused

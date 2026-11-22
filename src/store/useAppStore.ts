@@ -30,7 +30,11 @@ import {
 } from '../engine/geo';
 import { decodeShareableRouteFromUrl } from '../engine/gpx';
 import { extractRouteManeuvers } from '../engine/navigation';
-import { checkOfflineDfCacheStatus, warmOfflineDfCache } from '../engine/offlineCache';
+import {
+  checkOfflineDfCacheStatus,
+  getCachedOfflineCitySlugs,
+  warmOfflineDfCache,
+} from '../engine/offlineCache';
 import {
   type ActiveRideRecording,
   appendRideSample,
@@ -41,6 +45,15 @@ import {
 import { planMultiProfileRoutes, reverseGeocode } from '../engine/routing';
 import { computeUpdatedBatteryCalibration } from '../engine/telemetry';
 import { fetchLiveWeather } from '../engine/weather';
+import {
+  FREE_CUSTOM_VEHICLE_LIMIT,
+  FREE_GPX_EXPORT_LIMIT,
+  FREE_OFFLINE_CITY_LIMIT,
+  VIP_PRICE_LABEL,
+  fetchCloudVipStatus,
+  hideNativeAdBanner,
+  syncCloudVipActivation,
+} from '../mobile/monetizationBridge';
 import {
   configureNativeStatusBar,
   getNativeOrWebPosition,
@@ -187,13 +200,18 @@ export interface AppStore {
   // Live Navigation
   nav: NavState;
 
-  // Overlays / Modals
+  // Overlays / Modals & Phase 7 VIP
   garageOpen: boolean;
   compareOpen: boolean;
   menuOpen: boolean;
   cityModalOpen: boolean;
   selectedCitySlug: string;
   privacyModalOpen: boolean;
+  vipModalOpen: boolean;
+  vipLoading: boolean;
+  isPremium: boolean;
+  premiumSince?: string;
+  gpxExportCount: number;
   deleteAccountLoading: boolean;
   hazardPickerOpen: boolean;
   pendingHazardCoords: LngLat | null;
@@ -209,6 +227,10 @@ export interface AppStore {
   setAuthModalOpen: (open: boolean) => void;
   setMigrationPromptOpen: (open: boolean) => void;
   setPrivacyModalOpen: (open: boolean) => void;
+  setVipModalOpen: (open: boolean) => void;
+  activateVipLifetime: () => Promise<boolean>;
+  restoreVipPurchase: () => Promise<boolean>;
+  consumeGpxExportQuota: () => boolean;
   setCityModalOpen: (open: boolean) => void;
   selectCity: (citySlug: string, flyMap?: boolean) => Promise<void>;
   detectCityFromGps: () => Promise<void>;
@@ -441,6 +463,9 @@ function persistPrefs(state: AppStore): void {
     showHazards: state.showHazards,
     showSafetySegments: state.showSafetySegments,
     selectedCitySlug: state.selectedCitySlug,
+    isPremium: state.isPremium,
+    premiumSince: state.premiumSince,
+    gpxExportCount: state.gpxExportCount,
     homePlace: state.homePlace,
     workPlace: state.workPlace,
     batteryCalibrations: state.batteryCalibrations,
@@ -538,6 +563,11 @@ export const useAppStore = create<AppStore>((set, get) => ({
   cityModalOpen: false,
   selectedCitySlug: getInitialCitySlug(),
   privacyModalOpen: false,
+  vipModalOpen: false,
+  vipLoading: false,
+  isPremium: false,
+  premiumSince: undefined,
+  gpxExportCount: 0,
   deleteAccountLoading: false,
   hazardPickerOpen: false,
   pendingHazardCoords: null,
@@ -611,6 +641,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
       showHazards: prefs.showHazards ?? true,
       showSafetySegments: prefs.showSafetySegments ?? true,
       selectedCitySlug,
+      isPremium: Boolean(prefs.isPremium || get().isPremium),
+      premiumSince: prefs.premiumSince ?? get().premiumSince,
+      gpxExportCount: prefs.gpxExportCount ?? get().gpxExportCount ?? 0,
       homePlace: homeSaved
         ? { id: homeSaved.id, name: homeSaved.label, subtitle: homeSaved.address, coords: homeSaved.coords, source: 'curated' }
         : prefs.homePlace,
@@ -687,6 +720,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
     void get().loadCommunityData();
 
     if (user) {
+      void fetchCloudVipStatus(user.id).then((vip) => {
+        if (vip?.isPremium && !get().isPremium) {
+          void hideNativeAdBanner();
+          set({ isPremium: true, premiumSince: vip.premiumSince ?? new Date().toISOString() });
+          persistPrefs(get());
+        }
+      });
       const alreadyMigrated = await syncEngine.hasCompletedInitialMigration(user.id);
       const summary = await syncEngine.getLocalMigrationSummary();
       if (!alreadyMigrated && summary.total > 0) {
@@ -712,6 +752,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
         set({ authUser: nextUser });
         void syncEngine.setAuthenticatedUser(nextUser.id);
         void get().loadCommunityData();
+        void fetchCloudVipStatus(nextUser.id).then((vip) => {
+          if (vip?.isPremium && !get().isPremium) {
+            void hideNativeAdBanner();
+            set({ isPremium: true, premiumSince: vip.premiumSince ?? new Date().toISOString() });
+            persistPrefs(get());
+          }
+        });
         if (prevId !== nextUser.id) {
           void (async () => {
             const alreadyMigrated = await syncEngine.hasCompletedInitialMigration(nextUser.id);
@@ -862,6 +909,84 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({ privacyModalOpen: open });
   },
 
+  setVipModalOpen(open) {
+    set({ vipModalOpen: open });
+  },
+
+  async activateVipLifetime() {
+    set({ vipLoading: true });
+    const nowIso = new Date().toISOString();
+    const user = get().authUser;
+    if (user && hasSupabaseConfig()) {
+      await syncCloudVipActivation(user.id);
+    }
+    void hideNativeAdBanner();
+    void triggerHaptic('success');
+    set({
+      isPremium: true,
+      premiumSince: get().premiumSince ?? nowIso,
+      vipLoading: false,
+      vipModalOpen: false,
+    });
+    persistPrefs(get());
+    get().pushToast(
+      'Bem-vindo ao EixoVerde VIP!',
+      'Anúncios removidos e todos os benefícios vitalícios desbloqueados.',
+      'emerald'
+    );
+    return true;
+  },
+
+  async restoreVipPurchase() {
+    set({ vipLoading: true });
+    const user = get().authUser;
+    if (user && hasSupabaseConfig()) {
+      const cloudVip = await fetchCloudVipStatus(user.id);
+      if (cloudVip?.isPremium) {
+        void hideNativeAdBanner();
+        set({
+          isPremium: true,
+          premiumSince: cloudVip.premiumSince ?? get().premiumSince ?? new Date().toISOString(),
+          vipLoading: false,
+          vipModalOpen: false,
+        });
+        persistPrefs(get());
+        get().pushToast('Compra VIP restaurada!', 'Seus benefícios vitalícios estão ativos.', 'emerald');
+        return true;
+      }
+    }
+    set({ vipLoading: false });
+    if (get().isPremium) {
+      get().pushToast('EixoVerde VIP já está ativo neste aparelho.', undefined, 'emerald');
+      return true;
+    }
+    get().pushToast(
+      'Nenhuma compra encontrada',
+      user
+        ? 'Não encontramos uma licença VIP vinculada a esta conta.'
+        : 'Entre na sua conta EixoVerde para restaurar compras feitas em outro aparelho.',
+      'amber'
+    );
+    return false;
+  },
+
+  consumeGpxExportQuota() {
+    const s = get();
+    if (s.isPremium) return true;
+    if (s.gpxExportCount >= FREE_GPX_EXPORT_LIMIT) {
+      set({ vipModalOpen: true });
+      get().pushToast(
+        'Limite gratuito de GPX atingido',
+        `Desbloqueie exportações GPX ilimitadas no EixoVerde VIP (${VIP_PRICE_LABEL}).`,
+        'amber'
+      );
+      return false;
+    }
+    set({ gpxExportCount: s.gpxExportCount + 1 });
+    persistPrefs(get());
+    return true;
+  },
+
   setCityModalOpen(open) {
     set({ cityModalOpen: open });
   },
@@ -949,6 +1074,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
     const s = get();
     if (s.privacyModalOpen) {
       set({ privacyModalOpen: false });
+      return true;
+    }
+    if (s.vipModalOpen) {
+      set({ vipModalOpen: false });
       return true;
     }
     if (s.cityModalOpen) {
@@ -1110,6 +1239,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   startFreeRide() {
+    void hideNativeAdBanner();
     const state = get();
     const vehicle = selectActiveVehicle(state);
     const startPos = state.nav.currentPos ?? BRAND.defaultCenter;
@@ -1138,7 +1268,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         currentPos: startPos,
       },
     }));
-    get().pushToast('Pedal Livre iniciado!', 'Gravando trajeto com auto-pausa inteligente.', 'emerald');
+    get().pushToast('Modo Livre iniciado!', 'Gravando trajeto com auto-pausa inteligente.', 'emerald');
   },
 
   recordRideSample(sample) {
@@ -1224,12 +1354,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
       persistPrefs(get());
       const multPct = Math.round(nextCalibrations[finalized.vehicleId].efficiencyMultiplier * 100);
       get().pushToast(
-        'Pedal salvo & bateria calibrada!',
+        'Trajeto salvo & bateria calibrada!',
         `${finalized.vehicleName} ajustado para ${multPct}% da autonomia nominal.`,
         'emerald'
       );
     } else {
-      get().pushToast('Pedal salvo em Meus Pedais!', `${finalized.title} • ${finalized.distanceKm.toFixed(1).replace('.', ',')} km`, 'emerald');
+      get().pushToast('Trajeto salvo em Meus Trajetos!', `${finalized.title} • ${finalized.distanceKm.toFixed(1).replace('.', ',')} km`, 'emerald');
     }
   },
 
@@ -1243,7 +1373,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       rideSessions: s.rideSessions.filter((r) => r.id !== id),
       replayingRideId: s.replayingRideId === id ? null : s.replayingRideId,
     }));
-    get().pushToast('Registro de pedal removido', undefined, 'slate');
+    get().pushToast('Registro de trajeto removido', undefined, 'slate');
   },
 
   async saveRideAsRoute(id) {
@@ -1504,8 +1634,23 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   async warmOfflineCache() {
-    set({ offlineCacheLoading: true });
     const cap = getCapitalBySlug(get().selectedCitySlug);
+    const cachedSlugs = getCachedOfflineCitySlugs();
+    if (
+      !get().isPremium &&
+      cachedSlugs.length >= FREE_OFFLINE_CITY_LIMIT &&
+      !cachedSlugs.includes(cap.slug)
+    ) {
+      set({ vipModalOpen: true });
+      get().pushToast(
+        'Cache Offline em múltiplas capitais é VIP',
+        `O plano gratuito inclui 1 capital offline. Desbloqueie todas as 27 no EixoVerde VIP (${VIP_PRICE_LABEL}).`,
+        'amber'
+      );
+      return;
+    }
+
+    set({ offlineCacheLoading: true });
     const status = await warmOfflineDfCache(import.meta.env.BASE_URL, cap.slug);
     set({ offlineCache: status, offlineCacheLoading: false });
     if (status.ready) {
@@ -1558,6 +1703,17 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   async addCustomVehicle(vehicle) {
+    const existing = get().customVehicles;
+    const isUpdate = existing.some((v) => v.id === vehicle.id);
+    if (!get().isPremium && !isUpdate && existing.length >= FREE_CUSTOM_VEHICLE_LIMIT) {
+      set({ vipModalOpen: true });
+      get().pushToast(
+        'Garagem Personalizada Ilimitada é VIP',
+        `O plano gratuito inclui ${FREE_CUSTOM_VEHICLE_LIMIT} veículo personalizado. Desbloqueie ilimitados no VIP (${VIP_PRICE_LABEL}).`,
+        'amber'
+      );
+      return;
+    }
     await repository.saveCustomVehicle(vehicle);
     set((s) => ({
       customVehicles: [vehicle, ...s.customVehicles.filter((v) => v.id !== vehicle.id)],
@@ -2032,6 +2188,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   startNavigation(demo = false) {
+    void hideNativeAdBanner();
     const state = get();
     const cand = state.candidates[state.selectedCandidateIdx];
     if (!cand) return;

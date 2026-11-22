@@ -40,6 +40,7 @@ import { computeRouteMainBearingDeg } from '../../engine/weather';
 import { nativeShareUrl } from '../../mobile/nativeBridge';
 import { selectActiveVehicle, useAppStore } from '../../store/useAppStore';
 import type { PlaceResult, WeatherIconKind } from '../../types';
+import { AdBanner } from '../monetization/AdBanner';
 import { ElevationProfile } from './ElevationProfile';
 
 function WeatherGlyph({ kind }: { kind: WeatherIconKind }) {
@@ -95,6 +96,7 @@ export function RoutePreviewPanel() {
   const batteryCalibrations = useAppStore((s) => s.batteryCalibrations);
   const setGarageOpen = useAppStore((s) => s.setGarageOpen);
   const navPos = useAppStore((s) => s.nav.currentPos);
+  const consumeGpxExportQuota = useAppStore((s) => s.consumeGpxExportQuota);
   const pushToast = useAppStore((s) => s.pushToast);
   const showSafetySegments = useAppStore((s) => s.showSafetySegments);
   const toggleSafetySegments = useAppStore((s) => s.toggleSafetySegments);
@@ -124,10 +126,11 @@ export function RoutePreviewPanel() {
 
   const handleExportGpx = () => {
     if (!activeRoute) return;
+    if (!consumeGpxExportQuota()) return;
     const gpx = exportRouteToGpx(activeRoute.title, activeRoute.coords, activeRoute.subtitle);
     const slug = activeRoute.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40);
     downloadTextFile(`eixoverde-${slug || 'rota'}.gpx`, gpx);
-    pushToast('GPX exportado', 'Arquivo GPX 1.1 pronto para ciclocomputadores e apps de ciclismo.', 'emerald');
+    pushToast('GPX exportado', 'Arquivo GPX 1.1 pronto para ciclocomputadores e apps de navegação.', 'emerald');
   };
 
   const handleShareLink = async () => {
@@ -589,7 +592,7 @@ export function RoutePreviewPanel() {
                       </button>
                       {telemetry.calibrationApplied && (
                         <span
-                          title={`Autonomia calibrada em ${Math.round((telemetry.calibrationMultiplier ?? 1) * 100)}% com base nos seus pedais reais`}
+                          title={`Autonomia calibrada em ${Math.round((telemetry.calibrationMultiplier ?? 1) * 100)}% com base nos seus trajetos reais`}
                           className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-extrabold text-emerald-700 dark:text-emerald-300"
                         >
                           <Sparkles className="h-2.5 w-2.5" />
@@ -738,6 +741,9 @@ export function RoutePreviewPanel() {
 
                 {/* Elevation & Way-Type Surface Analytics */}
                 <ElevationProfile route={activeRoute} />
+
+                {/* Phase 7: Compact Ad Banner (Free tier only, hidden during live nav & for VIP) */}
+                <AdBanner placement="preview" />
               </div>
             );
           })()}
