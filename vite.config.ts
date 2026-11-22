@@ -87,6 +87,7 @@ export default defineConfig(({ command, mode }) => {
             '**/icons/icon-1024.png',
             '**/icons/icon-foreground.png',
             '**/icons/splash-1280.png',
+            '**/icons/feature-graphic-1024x500.png',
             '**/data/cities/*.geojson',
           ],
           runtimeCaching: [

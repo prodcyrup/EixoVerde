@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Política de Privacidade &amp; Termos (LGPD) — EixoVerde</title>
+    <link rel="icon" type="image/svg+xml" href="./icons/eixoverde-icon.svg" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f8fafc;
+        --card: #ffffff;
+        --text: #0f172a;
+        --muted: #475569;
+        --border: #e2e8f0;
+        --accent: #059669;
+        --accent-soft: rgba(16, 185, 129, 0.12);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0b1116;
+          --card: #0f172a;
+          --text: #f8fafc;
+          --muted: #94a3b8;
+          --border: #1e293b;
+          --accent: #34d399;
+          --accent-soft: rgba(52, 211, 153, 0.14);
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.65;
+      }
+      .wrap {
+        max-width: 780px;
+        margin: 0 auto;
+        padding: 32px 20px 64px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 24px;
+      }
+      header img {
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 1.5rem;
+        line-height: 1.25;
+      }
+      .subtitle {
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin-top: 2px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 24px;
+        margin-bottom: 16px;
+      }
+      .highlight {
+        background: var(--accent-soft);
+        border: 1px solid rgba(16, 185, 129, 0.35);
+        border-radius: 16px;
+        padding: 16px 18px;
+        margin-bottom: 20px;
+      }
+      h2 {
+        margin-top: 0;
+        font-size: 1.1rem;
+        color: var(--accent);
+      }
+      ul {
+        padding-left: 20px;
+        margin: 8px 0;
+      }
+      li {
+        margin-bottom: 6px;
+      }
+      a {
+        color: var(--accent);
+        font-weight: 600;
+      }
+      footer {
+        margin-top: 28px;
+        font-size: 0.85rem;
+        color: var(--muted);
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <header>
+        <img src="./icons/eixoverde-icon.svg" alt="EixoVerde" />
+        <div>
+          <h1>Política de Privacidade &amp; Termos de Uso</h1>
+          <div class="subtitle">EixoVerde (<code>br.com.eixoverde.app</code>) • Conformidade LGPD &amp; Google Play</div>
+        </div>
+      </header>
+
+      <div class="highlight">
+        <strong>Compromisso com a Privacidade (Lei nº 13.709/2018 — LGPD):</strong>
+        O <strong>EixoVerde</strong> funciona de forma completa sem exigir cadastro obrigatório (modo Visitante / Offline-First). Não vendemos, alugamos ou comercializamos seus dados pessoais com corretores de dados.
+      </div>
+
+      <section class="card">
+        <h2>1. Dados Coletados e Finalidade</h2>
+        <ul>
+          <li>
+            <strong>Localização (GPS em Primeiro Plano):</strong> utilizada apenas quando você autoriza o acesso ao GPS para centralizar o mapa, detectar a capital mais próxima, calcular rotas seguras em ciclovias, guiar curva a curva e registrar trajetos iniciados por você. Não realizamos rastreamento oculto quando o app não está em uso.
+          </li>
+          <li>
+            <strong>Conta Opcional (EixoVerde Cloud):</strong> caso você escolha criar uma conta via e-mail ou login com Google, armazenamos de forma criptografada (HTTPS/TLS + Row-Level Security no Supabase) seu e-mail, nome de exibição, veículos da garagem, locais salvos, rotas, histórico de trajetos, alertas comunitários e avaliações.
+          </li>
+          <li>
+            <strong>Armazenamento Local (Offline-First):</strong> no modo Visitante, todas as suas preferências, rotas e histórico ficam gravados exclusivamente no seu dispositivo (IndexedDB / cache local).
+          </li>
+          <li>
+            <strong>Anúncios e Versão Premium (quando aplicável):</strong> caso o aplicativo exiba banners publicitários ou ofereça desbloqueio Premium via Google Play Billing, os provedores oficiais (Google AdMob / Google Play) podem processar identificadores técnicos de dispositivo conforme suas próprias políticas de privacidade e consentimento.
+          </li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>2. Compartilhamento com Terceiros</h2>
+        <p>O EixoVerde utiliza serviços técnicos essenciais para entrega de mapas, roteamento e clima:</p>
+        <ul>
+          <li><strong>Mapas &amp; Clima:</strong> OpenFreeMap / MapTiler (tiles vetoriais) e Open-Meteo (previsão climática para a região visualizada).</li>
+          <li><strong>Roteamento &amp; Busca de Endereços:</strong> OpenRouteService (via proxy seguro), BRouter, OSRM, Photon e OpenStreetMap Nominatim.</li>
+          <li><strong>Sincronização Cloud (Opcional):</strong> Supabase (autenticação e banco de dados PostgreSQL/PostGIS com criptografia em trânsito e em repouso).</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>3. Exclusão de Conta e Dados (Direito do Titular)</h2>
+        <p>
+          Você pode excluir permanentemente sua conta e todos os dados sincronizados na nuvem a qualquer momento diretamente dentro do aplicativo ou seguindo as instruções na nossa página dedicada:
+        </p>
+        <ul>
+          <li><strong>Dentro do app:</strong> abra o <strong>Menu lateral (☰)</strong> → cartão da sua conta → <strong>Excluir minha conta e dados na nuvem</strong> → <strong>Confirmar Exclusão</strong>.</li>
+          <li><strong>Página de instruções:</strong> <a href="./exclusao-conta.html">Solicitar / Consultar Exclusão de Conta e Dados</a>.</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>4. Termos de Uso &amp; Segurança Viária</h2>
+        <p>
+          As rotas sugeridas, classificações de ciclovias, estimativas de autonomia de bateria e alertas comunitários possuem caráter informativo. Respeite sempre o Código de Trânsito Brasileiro (CTB), a sinalização local e utilize equipamentos de proteção adequados ao seu veículo.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>5. Contato do Controlador</h2>
+        <p>
+          Para dúvidas sobre privacidade, direitos previstos na LGPD ou suporte técnico, entre em contato pelo e-mail:
+          <a href="mailto:prodcyrup@gmail.com">prodcyrup@gmail.com</a>.
+        </p>
+      </section>
+
+      <footer>
+        Última atualização: Novembro de 2026 • <a href="./">Voltar ao EixoVerde</a>
+      </footer>
+    </main>
+  </body>
+</html>

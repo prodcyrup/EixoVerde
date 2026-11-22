@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Exclusão de Conta e Dados — EixoVerde</title>
+    <link rel="icon" type="image/svg+xml" href="./icons/eixoverde-icon.svg" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f8fafc;
+        --card: #ffffff;
+        --text: #0f172a;
+        --muted: #475569;
+        --border: #e2e8f0;
+        --accent: #059669;
+        --danger: #e11d48;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0b1116;
+          --card: #0f172a;
+          --text: #f8fafc;
+          --muted: #94a3b8;
+          --border: #1e293b;
+          --accent: #34d399;
+          --danger: #fb7185;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.65;
+      }
+      .wrap {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 32px 20px 64px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 24px;
+      }
+      header img {
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 1.45rem;
+      }
+      .subtitle {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 24px;
+        margin-bottom: 16px;
+      }
+      h2 {
+        margin-top: 0;
+        font-size: 1.08rem;
+        color: var(--accent);
+      }
+      ol, ul {
+        padding-left: 20px;
+      }
+      li {
+        margin-bottom: 8px;
+      }
+      a {
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .badge {
+        display: inline-block;
+        background: rgba(225, 29, 72, 0.12);
+        color: var(--danger);
+        font-weight: 700;
+        font-size: 0.85rem;
+        padding: 4px 10px;
+        border-radius: 999px;
+        margin-bottom: 10px;
+      }
+      footer {
+        margin-top: 28px;
+        font-size: 0.85rem;
+        color: var(--muted);
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <header>
+        <img src="./icons/eixoverde-icon.svg" alt="EixoVerde" />
+        <div>
+          <h1>Exclusão de Conta e Dados</h1>
+          <div class="subtitle">EixoVerde (<code>br.com.eixoverde.app</code>) • LGPD &amp; Google Play Data Safety</div>
+        </div>
+      </header>
+
+      <section class="card">
+        <span class="badge">Exclusão Imediata no Aplicativo</span>
+        <h2>Como excluir sua conta instantaneamente</h2>
+        <ol>
+          <li>Abra o aplicativo <strong>EixoVerde</strong> (Android, iOS ou <a href="./">Web App</a>) conectado à sua conta.</li>
+          <li>Toque no ícone de <strong>Menu lateral (☰)</strong> no canto superior esquerdo.</li>
+          <li>No cartão da sua conta, toque em <strong>Excluir minha conta e dados na nuvem</strong>.</li>
+          <li>(Opcional) Marque <em>&ldquo;Apagar também dados salvos neste aparelho&rdquo;</em> caso queira limpar o cache local.</li>
+          <li>Toque em <strong>Confirmar Exclusão</strong>. A remoção é executada imediatamente.</li>
+        </ol>
+      </section>
+
+      <section class="card">
+        <h2>Quais dados são excluídos?</h2>
+        <ul>
+          <li><strong>Excluídos imediatamente e permanentemente:</strong> credenciais de autenticação (<code>auth.users</code>), perfil de usuário, veículos personalizados da garagem, locais salvos, rotas sincronizadas, histórico de trajetos na nuvem, preferências sincronizadas e avaliações associadas à sua conta.</li>
+          <li><strong>Retenção:</strong> nenhum dado pessoal da conta é retido após a confirmação da exclusão.</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>Não tem mais acesso ao aplicativo?</h2>
+        <p>
+          Você também pode solicitar a exclusão manual enviando um e-mail a partir do endereço cadastrado para
+          <a href="mailto:prodcyrup@gmail.com?subject=Solicita%C3%A7%C3%A3o%20de%20Exclus%C3%A3o%20de%20Conta%20-%20EixoVerde">prodcyrup@gmail.com</a>
+          com o assunto <strong>&ldquo;Exclusão de Conta — EixoVerde&rdquo;</strong>. Processaremos sua solicitação em até 48 horas úteis.
+        </p>
+      </section>
+
+      <footer>
+        <a href="./privacidade.html">Política de Privacidade (LGPD)</a> • <a href="./">Voltar ao EixoVerde</a>
+      </footer>
+    </main>
+  </body>
+</html>
