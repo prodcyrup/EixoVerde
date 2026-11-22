@@ -1263,6 +1263,186 @@ def run_e2e() -> int:
             check("Cloud E2E pass zero uncaught page errors", len(cloud_errors) == 0, "; ".join(cloud_errors))
             cloud_ctx.close()
 
+            # =====================================================================
+            # PASS 3 — PHASE 8 OFFICIAL WEBSITE (eixoverde.com) & /app/ PROD BUNDLE
+            # =====================================================================
+            print("\n=== PASS 3: OFFICIAL WEBSITE (eixoverde.com) & /app/ PRODUCTION BUNDLE ===", flush=True)
+            dist_root = REPO_ROOT / "dist"
+            if not (dist_root / "index.html").exists() or not (dist_root / "app" / "index.html").exists():
+                subprocess.run(["npm", "run", "build"], cwd=str(REPO_ROOT), check=True)
+
+            port_site = find_free_port()
+            while port_site in (port_guest, port_cloud):
+                port_site = find_free_port()
+            URL_SITE = f"http://127.0.0.1:{port_site}/"
+
+            proc_site = subprocess.Popen(
+                [sys.executable, "-m", "http.server", str(port_site), "--bind", "127.0.0.1", "--directory", str(dist_root)],
+                cwd=str(REPO_ROOT),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            try:
+                site_ready = wait_for_server(URL_SITE)
+                check("Phase 8 production dist/ static server started cleanly", site_ready)
+
+                def fetch_text(path: str) -> tuple[int, str]:
+                    with urllib.request.urlopen(f"{URL_SITE}{path.lstrip('/')}", timeout=5) as resp:
+                        return resp.status, resp.read().decode("utf-8", errors="replace")
+
+                st_ads, txt_ads = fetch_text("/app-ads.txt")
+                check(
+                    "Phase 8 /app-ads.txt returns HTTP 200 with verified AdMob pub-6690812959868851",
+                    st_ads == 200 and "google.com, pub-6690812959868851, DIRECT, f08c47fec0942fa0" in txt_ads,
+                )
+                st_robots, txt_robots = fetch_text("/robots.txt")
+                st_sitemap, txt_sitemap = fetch_text("/sitemap.xml")
+                check(
+                    "Phase 8 /robots.txt and /sitemap.xml return HTTP 200 for eixoverde.com",
+                    st_robots == 200 and "https://eixoverde.com/sitemap.xml" in txt_robots
+                    and st_sitemap == 200 and "https://eixoverde.com/app/" in txt_sitemap,
+                )
+                st_hdr, txt_hdr = fetch_text("/_headers")
+                st_red, txt_red = fetch_text("/_redirects")
+                check(
+                    "Phase 8 Cloudflare Pages /_headers and /_redirects exist in dist/",
+                    st_hdr == 200 and "/app-ads.txt" in txt_hdr
+                    and st_red == 200 and "https://www.eixoverde.com/*" in txt_red,
+                )
+                st_man, txt_man = fetch_text("/app/manifest.webmanifest")
+                man_json = json.loads(txt_man)
+                check(
+                    "Phase 8 PWA manifest isolated to /app/ scope & start_url with br.com.eixoverde.app",
+                    st_man == 200
+                    and man_json.get("id") == "br.com.eixoverde.app"
+                    and man_json.get("start_url") == "/app/"
+                    and man_json.get("scope") == "/app/",
+                )
+
+                # Desktop Light + Dark verification & interactive controls
+                site_errors = []
+                site_ctx = browser.new_context(viewport={"width": 1440, "height": 900}, color_scheme="light")
+                spage = site_ctx.new_page()
+                spage.on("pageerror", lambda e: site_errors.append(str(e)))
+                spage.goto(URL_SITE, wait_until="domcontentloaded", timeout=15000)
+                spage.wait_for_selector("#ev-cta-web", timeout=8000)
+                time.sleep(0.3)
+
+                desktop_overflow = spage.evaluate("() => document.documentElement.scrollWidth > window.innerWidth")
+                check("Phase 8 Landing Desktop (1440px) zero horizontal overflow", not desktop_overflow)
+                check(
+                    "Phase 8 Landing shows Web App CTA (./app/) & Google Play CTA (br.com.eixoverde.app)",
+                    spage.locator("#ev-cta-web").get_attribute("href") == "./app/"
+                    and spage.locator("#ev-cta-play").get_attribute("href")
+                    == "https://play.google.com/store/apps/details?id=br.com.eixoverde.app",
+                )
+                save_shot(spage, "e2e_site_desktop_light.png")
+
+                # Hero phone showcase tab switching
+                spage.click("#ev-tab-nav")
+                time.sleep(0.15)
+                nav_active = spage.locator("#ev-stage-nav").evaluate("el => el.classList.contains('is-active')")
+                spage.click("#ev-tab-garage")
+                time.sleep(0.15)
+                garage_active = spage.locator("#ev-stage-garage").evaluate("el => el.classList.contains('is-active')")
+                check("Phase 8 Hero interactive phone tabs switch cleanly (Navegação 3D & Garagem)", nav_active and garage_active)
+                spage.click("#ev-tab-map")
+
+                # 27 capitals region filter
+                spage.click("button[data-region-filter='Nordeste']")
+                time.sleep(0.15)
+                ne_count = spage.locator("#ev-capitals-grid .ev-capital-card").count()
+                spage.click("button[data-region-filter='Norte']")
+                time.sleep(0.15)
+                n_count = spage.locator("#ev-capitals-grid .ev-capital-card").count()
+                check("Phase 8 27 Capitals filter renders 9 Nordeste & 7 Norte capitals", ne_count == 9 and n_count == 7)
+
+                # Manual theme toggle -> dark + atomic background update + localStorage sync
+                spage.evaluate("() => window.scrollTo(0, 0)")
+                spage.click("#ev-theme-toggle")
+                time.sleep(0.15)
+                dark_state = spage.evaluate(
+                    "() => ({ hasDark: document.documentElement.classList.contains('dark'), saved: localStorage.getItem('eixoverde:theme'), bodyBg: getComputedStyle(document.body).backgroundColor })"
+                )
+                check(
+                    "Phase 8 Theme toggle activates dark mode atomically and syncs localStorage eixoverde:theme",
+                    dark_state["hasDark"]
+                    and dark_state["saved"] == "dark"
+                    and dark_state["bodyBg"] == "rgb(9, 15, 18)",
+                    json.dumps(dark_state),
+                )
+                save_shot(spage, "e2e_site_desktop_dark.png")
+
+                # Clicking "Usar Versão Web" opens /app/ in dark mode with zero failed /app/ requests
+                failed_app_assets = []
+                spage.on("response", lambda r: failed_app_assets.append(f"{r.status}:{r.url}") if r.url.startswith(URL_SITE) and r.status >= 400 else None)
+                spage.click("#ev-cta-web")
+                spage.wait_for_url(f"{URL_SITE}app/**", timeout=10000)
+                spage.wait_for_selector("aside #eixoverde-search-input", timeout=15000)
+                time.sleep(0.4)
+                app_inherited_dark = spage.evaluate("() => document.documentElement.classList.contains('dark')")
+                check(
+                    "Phase 8 'Usar Versão Web' launches /app/ PWA, inherits theme & loads assets cleanly",
+                    app_inherited_dark and len(failed_app_assets) == 0,
+                    ", ".join(failed_app_assets),
+                )
+
+                # Root ?share= auto-forwards to /app/?share=
+                spage.goto(f"{URL_SITE}?share=eyJuIjoiVGVzdGUiLCJwIjoic2FmZSIsInciOltbLTQ3Ljg4LC0xNS43OV0sWy00Ny44NiwtMTUuODBdXX0", wait_until="domcontentloaded", timeout=15000)
+                spage.wait_for_url(f"{URL_SITE}app/?share=*", timeout=10000)
+                check("Phase 8 Root /?share=... redirects automatically to /app/?share=...", "/app/?share=" in spage.url)
+
+                # Legal pages render with contato@eixoverde.com
+                spage.goto(f"{URL_SITE}privacidade.html", wait_until="domcontentloaded", timeout=10000)
+                priv_text = spage.locator("body").inner_text()
+                spage.goto(f"{URL_SITE}exclusao-conta.html", wait_until="domcontentloaded", timeout=10000)
+                del_text = spage.locator("body").inner_text()
+                check(
+                    "Phase 8 /privacidade.html & /exclusao-conta.html show contato@eixoverde.com",
+                    "contato@eixoverde.com" in priv_text and "contato@eixoverde.com" in del_text,
+                )
+                site_ctx.close()
+
+                # Responsive zero-clipping & adaptive system dark mode check across mobile viewports
+                for label, vw, vh, scheme in [
+                    ("iPhone SE Light", 375, 667, "light"),
+                    ("iPhone SE Dark", 375, 667, "dark"),
+                    ("iPhone 14", 390, 844, "light"),
+                    ("Android 412", 412, 915, "dark"),
+                ]:
+                    mctx = browser.new_context(viewport={"width": vw, "height": vh}, color_scheme=scheme)
+                    mpage = mctx.new_page()
+                    mpage.on("pageerror", lambda e: site_errors.append(str(e)))
+                    mpage.goto(URL_SITE, wait_until="domcontentloaded", timeout=15000)
+                    mpage.wait_for_selector("#ev-cta-web", timeout=8000)
+                    time.sleep(0.25)
+                    ov = mpage.evaluate("() => document.documentElement.scrollWidth > window.innerWidth")
+                    matched_scheme = mpage.evaluate(
+                        "(wantDark) => document.documentElement.classList.contains('dark') === wantDark",
+                        scheme == "dark",
+                    )
+                    check(
+                        f"Phase 8 Landing {label} ({vw}x{vh}) zero horizontal clipping & adaptive {scheme} theme",
+                        (not ov) and matched_scheme,
+                    )
+                    if label == "iPhone SE Light":
+                        save_shot(mpage, "e2e_site_iphone_se_light.png")
+                    elif label == "iPhone SE Dark":
+                        save_shot(mpage, "e2e_site_iphone_se_dark.png")
+                    mctx.close()
+
+                check("Phase 8 Official Website pass zero uncaught page errors", len(site_errors) == 0, "; ".join(site_errors))
+            finally:
+                try:
+                    os.killpg(os.getpgid(proc_site.pid), signal.SIGTERM)
+                except Exception:
+                    proc_site.terminate()
+                try:
+                    proc_site.wait(timeout=5)
+                except Exception:
+                    proc_site.kill()
+
             browser.close()
     finally:
         for pr in (proc_guest, proc_cloud):

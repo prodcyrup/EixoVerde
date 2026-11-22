@@ -1,3 +1,4 @@
+import { BRAND } from '../config/brand';
 import type { Coord3D, LngLat, SavedRoute } from '../types';
 import { computeElevationStats, computePathDistanceKm, computeSurfaceBreakdown } from './geo';
 
@@ -157,7 +158,7 @@ export function encodeShareableRouteUrl(name: string, waypoints: LngLat[], profi
     !window.location.href.startsWith('capacitor://') &&
     !window.location.href.startsWith('https://localhost')
       ? window.location.href
-      : 'https://prodcyrup.github.io/EixoVerde/';
+      : BRAND.webAppUrl;
   const url = new URL(href);
   url.searchParams.set('share', encoded);
   return url.toString();

@@ -32,18 +32,21 @@ describe('nativeBridge.ts — Deep-Link Parser & Runtime Detection', () => {
     expect(parsed?.authType).toBe('recovery');
   });
 
-  it('parses shared route deep links (?share=...) from universal or custom scheme URLs', () => {
-    const parsed = parseDeepLinkUrl(
-      'https://prodcyrup.github.io/EixoVerde/?share=eyJ2IjoxfQ=='
-    );
-    expect(parsed).not.toBeNull();
-    expect(parsed?.shareParam).toBe('eyJ2IjoxfQ==');
-    expect(parsed?.authCode).toBeUndefined();
+  it('parses shared route deep links (?share=...) from eixoverde.com/app/ and legacy universal URLs', () => {
+    const primary = parseDeepLinkUrl('https://eixoverde.com/app/?share=eyJ2IjoxfQ==');
+    expect(primary).not.toBeNull();
+    expect(primary?.shareParam).toBe('eyJ2IjoxfQ==');
+    expect(primary?.authCode).toBeUndefined();
+
+    const legacy = parseDeepLinkUrl('https://prodcyrup.github.io/EixoVerde/?share=eyJ2IjoxfQ==');
+    expect(legacy).not.toBeNull();
+    expect(legacy?.shareParam).toBe('eyJ2IjoxfQ==');
   });
 
   it('returns null gracefully on empty or irrelevant URLs', () => {
     expect(parseDeepLinkUrl('   ')).toBeNull();
-    expect(parseDeepLinkUrl('https://prodcyrup.github.io/EixoVerde/')).toBeNull();
+    expect(parseDeepLinkUrl('https://eixoverde.com/')).toBeNull();
+    expect(parseDeepLinkUrl('https://eixoverde.com/app/')).toBeNull();
   });
 });
 

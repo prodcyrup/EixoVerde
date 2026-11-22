@@ -41,7 +41,7 @@ export function getRuntimePlatform(): RuntimePlatform {
 
 /**
  * Parses a custom scheme (`br.com.eixoverde.app://auth-callback#access_token=...`)
- * or universal link (`https://prodcyrup.github.io/EixoVerde/?share=...`) into
+ * or universal link (`https://eixoverde.com/app/?share=...`) into
  * structured auth tokens or shared route parameters.
  */
 export function parseDeepLinkUrl(rawUrl: string): ParsedDeepLink | null {

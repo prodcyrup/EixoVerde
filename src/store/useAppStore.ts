@@ -16,6 +16,7 @@ import { subscribeRealtimeHazards } from '../cloud/realtimeHazards';
 import { BRAND } from '../config/brand';
 import { hasSupabaseConfig } from '../config/providers';
 import {
+  BRAZIL_CAPITALS,
   type BrazilCapitalCity,
   findNearestCapital,
   getCapitalBySlug,
@@ -1220,8 +1221,18 @@ export const useAppStore = create<AppStore>((set, get) => ({
       return;
     }
 
+    // Check if opened from eixoverde.com with an explicit capital deep-link (?city=sao-paulo)
+    let deepLinkedCity = false;
+    if (typeof window !== 'undefined' && window.location?.search) {
+      const cityParam = new URLSearchParams(window.location.search).get('city')?.trim().toLowerCase();
+      if (cityParam && BRAZIL_CAPITALS.some((c) => c.slug === cityParam)) {
+        deepLinkedCity = true;
+        await get().selectCity(cityParam, true);
+      }
+    }
+
     // Automatically locate user's real GPS position on startup so Point A is always accurate
-    void get().locateCurrentPosition({ silent: true, flyToUser: activeCap.slug === 'brasilia' });
+    void get().locateCurrentPosition({ silent: true, flyToUser: !deepLinkedCity && activeCap.slug === 'brasilia' });
   },
 
   async refreshWeather(coords) {

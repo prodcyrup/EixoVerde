@@ -18,15 +18,16 @@ Por segurança, o aplicativo já vem configurado com os **IDs oficiais de teste 
 
 Quando sua conta Google Play Developer for aprovada e você quiser ativar anúncios reais:
 
-1. Acesse [https://admob.google.com](https://admob.google.com) com a mesma conta Google do Play Console.
-2. Clique em **Apps → Adicionar app**:
+1. Acesse [https://admob.google.com](https://admob.google.com) utilizando sua conta única de Publisher Google (`pub-6690812959868851` — não crie uma segunda conta AdMob/AdSense individual, pois o Google permite apenas uma conta por pessoa física).
+2. Confirme que o arquivo público [`public/app-ads.txt`](../public/app-ads.txt) já está acessível em `https://eixoverde.com/app-ads.txt` e que o site do desenvolvedor na Play Console aponta para `https://eixoverde.com`.
+3. Clique em **Apps → Adicionar app**:
    - Plataforma: **Android**
    - O app já está publicado na Google Play? Selecione *Sim* (após publicar) ou *Não* (e vincule depois usando o package ID `br.com.eixoverde.app`).
-3. Copie o **ID do App (App ID)** no formato `ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY`.
-4. Atualize a linha `<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" ... />` em [`android/app/src/main/AndroidManifest.xml`](../android/app/src/main/AndroidManifest.xml) substituindo o ID de teste pelo seu **App ID de produção**.
-5. No painel do AdMob, abra **Blocos de anúncios (Ad units) → Adicionar bloco de anúncios → Banner** (ex.: `EixoVerde Banner Explorar`).
-6. Copie o **ID do Bloco de Anúncios (Ad Unit ID)** no formato `ca-app-pub-XXXXXXXXXXXXXXXX/ZZZZZZZZZZ`.
-7. Cadastre o segredo no GitHub Actions (**Settings → Secrets and variables → Actions**) ou no `.env.local`:
+4. Copie o **ID do App (App ID)** no formato `ca-app-pub-6690812959868851~YYYYYYYYYY`.
+5. Atualize a linha `<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" ... />` em [`android/app/src/main/AndroidManifest.xml`](../android/app/src/main/AndroidManifest.xml) substituindo o ID de teste pelo seu **App ID de produção**.
+6. No painel do AdMob, abra **Blocos de anúncios (Ad units) → Adicionar bloco de anúncios → Banner** (ex.: `EixoVerde Banner Explorar`).
+7. Copie o **ID do Bloco de Anúncios (Ad Unit ID)** no formato `ca-app-pub-6690812959868851/ZZZZZZZZZZ`.
+8. Cadastre o segredo no GitHub Actions (**Settings → Secrets and variables → Actions**) ou no `.env.local`:
    - `VITE_ADMOB_ANDROID_BANNER_ID=ca-app-pub-XXXXXXXXXXXXXXXX/ZZZZZZZZZZ`
    - *(Opcional futuro para iOS)* `VITE_ADMOB_IOS_BANNER_ID=ca-app-pub-XXXXXXXXXXXXXXXX/WWWWWWWWWW`
 

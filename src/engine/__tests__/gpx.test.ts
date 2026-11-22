@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { exportRouteToGpx } from '../gpx';
+import {
+  decodeShareableRouteFromUrl,
+  encodeShareableRouteUrl,
+  exportRouteToGpx,
+} from '../gpx';
 import type { Coord3D } from '../../types';
 
 describe('gpx.ts export and XML escaping', () => {
@@ -25,5 +29,23 @@ describe('gpx.ts export and XML escaping', () => {
     const gpx = exportRouteToGpx('Teste 2D', coords);
     expect(gpx).not.toContain('<ele>');
     expect(gpx).toContain('<trkpt lat="-15.790000" lon="-47.880000"></trkpt>');
+  });
+
+  it('encodes shareable links on https://eixoverde.com/app/ and decodes round-trip cleanly', () => {
+    const url = encodeShareableRouteUrl(
+      'Eixo Monumental Seguro',
+      [
+        [-47.8825, -15.7912],
+        [-47.8626, -15.7989],
+      ],
+      'safe'
+    );
+    expect(url.startsWith('https://eixoverde.com/app/?share=')).toBe(true);
+    const param = new URL(url).searchParams.get('share') ?? '';
+    const decoded = decodeShareableRouteFromUrl(param);
+    expect(decoded).not.toBeNull();
+    expect(decoded?.name).toBe('Eixo Monumental Seguro');
+    expect(decoded?.profile).toBe('safe');
+    expect(decoded?.waypoints).toHaveLength(2);
   });
 });

@@ -40,10 +40,13 @@ No painel do Supabase, vá em **Authentication → URL Configuration**:
 
 - **Site URL**:
   ```text
-  https://prodcyrup.github.io/EixoVerde/
+  https://eixoverde.com/app/
   ```
-- **Redirect URLs** (adicione todas abaixo para Web + Apps Nativos Android/iOS):
+- **Redirect URLs** (adicione todas abaixo para Web `eixoverde.com` + Apps Nativos Android/iOS):
   ```text
+  https://eixoverde.com/app/
+  https://eixoverde.com/app/**
+  https://eixoverde.com/
   https://prodcyrup.github.io/EixoVerde/**
   http://localhost:5173/**
   http://127.0.0.1:5173/**
@@ -58,6 +61,7 @@ Clique em **Save**.
 ### (Opcional) Ativar Login com Google ("Continuar com Google")
 1. No [Google Cloud Console — Credentials](https://console.cloud.google.com/apis/credentials), clique em **Create Credentials → OAuth client ID** (tipo **Web application**).
 2. Em **Authorized JavaScript origins**, adicione:
+   - `https://eixoverde.com`
    - `https://prodcyrup.github.io`
    - `https://<seu-project-ref>.supabase.co`
 3. Em **Authorized redirect URIs**, cole a **Callback URL (for OAuth)** exibida no painel do Supabase em **Authentication → Providers → Google** (formato `https://<seu-project-ref>.supabase.co/auth/v1/callback`).

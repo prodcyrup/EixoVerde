@@ -106,10 +106,28 @@ export function PrivacyPolicyModal() {
 
           <section className="space-y-1">
             <h3 className="text-xs font-extrabold text-slate-900 dark:text-white">
-              4. Termos de Uso &amp; Segurança Viária
+              4. Termos de Uso, Segurança Viária &amp; Contato
             </h3>
             <p>
               As sugestões de rotas, índices de segurança cicloviária e alertas comunitários têm caráter informativo. Mantenha sempre atenção plena ao trânsito, respeite o Código de Trânsito Brasileiro (CTB) e utilize equipamentos de proteção.
+            </p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Contato do controlador (LGPD):{' '}
+              <a
+                href={`mailto:${BRAND.contactEmail}`}
+                className="font-bold text-emerald-600 underline decoration-emerald-500/40 underline-offset-2 dark:text-emerald-400"
+              >
+                {BRAND.contactEmail}
+              </a>{' '}
+              •{' '}
+              <a
+                href={BRAND.privacyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold text-emerald-600 underline decoration-emerald-500/40 underline-offset-2 dark:text-emerald-400"
+              >
+                Versão pública online
+              </a>
             </p>
           </section>
         </div>

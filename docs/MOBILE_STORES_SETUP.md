@@ -11,20 +11,28 @@ O **EixoVerde** (`br.com.eixoverde.app`) utiliza **Capacitor** sobre o bundle un
 | **Application ID / Bundle ID** | `br.com.eixoverde.app` |
 | **Nome do Aplicativo** | `EixoVerde` |
 | **Esquema Customizado (OAuth / Magic Link)** | `br.com.eixoverde.app://auth-callback` |
+| **Site Oficial & Web PWA** | `https://eixoverde.com/` • `https://eixoverde.com/app/` |
+| **Política LGPD & Exclusão Pública** | `https://eixoverde.com/privacidade.html` • `https://eixoverde.com/exclusao-conta.html` |
+| **Verificação Google AdMob** | `https://eixoverde.com/app-ads.txt` (`pub-6690812959868851`) |
+| **E-mail Oficial de Suporte** | `contato@eixoverde.com` |
 | **Configuração Principal** | `capacitor.config.ts` |
 | **Ponte Nativa & Hardware Back** | `src/mobile/nativeBridge.ts` |
 
 ### Configuração Obrigatória no Supabase Dashboard (Redirect URLs)
-Para que o login com Google, Link Mágico e Recuperação de Senha retornem automaticamente para dentro do aplicativo Android/iOS instalado:
+Para que o login com Google, Link Mágico e Recuperação de Senha retornem automaticamente para dentro do aplicativo Web (`eixoverde.com/app/`) e Android/iOS instalado:
 1. Abra o painel do projeto no **Supabase Dashboard** → **Authentication** → **URL Configuration**.
-2. Em **Redirect URLs**, adicione:
+2. Em **Site URL**, defina `https://eixoverde.com/app/`.
+3. Em **Redirect URLs**, adicione:
    ```text
+   https://eixoverde.com/app/
+   https://eixoverde.com/app/**
+   https://eixoverde.com/
    br.com.eixoverde.app://auth-callback
    capacitor://localhost
    http://localhost
    https://localhost
    ```
-3. No **SQL Editor** do Supabase, execute a migration idempotente da Fase 5 para habilitar a exclusão instantânea de conta dentro do app (`public.delete_my_account()`):
+4. No **SQL Editor** do Supabase, execute a migration idempotente da Fase 5 para habilitar a exclusão instantânea de conta dentro do app (`public.delete_my_account()`):
    - Arquivo: `supabase/migrations/20261121000004_eixoverde_phase5_account_delete.sql`
 
 ---
