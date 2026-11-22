@@ -14,20 +14,20 @@ O **EixoVerde** adota um modelo transparente, não intrusivo e 100% compatível 
 
 ## Parte 1 — Configurar o Google AdMob (Android)
 
-O **App ID oficial de produção** (`ca-app-pub-6690812959868851~6422068887`) já está configurado em [`android/app/src/main/AndroidManifest.xml`](../android/app/src/main/AndroidManifest.xml). Por segurança, o **Bloco de Anúncio Banner** continua usando automaticamente o **ID oficial de teste do Google** (`ca-app-pub-3940256099942544/6300978111`, `isTesting: true`) em `monetizationBridge.ts` até que o segredo `VITE_ADMOB_ANDROID_BANNER_ID` seja configurado — impedindo qualquer clique inválido durante testes.
+Os IDs oficiais de produção do **EixoVerde (Android)** já estão configurados:
+- **App ID (`AndroidManifest.xml`):** `ca-app-pub-6690812959868851~6422068887`
+- **Banner Ad Unit ID (GitHub Actions Secret `VITE_ADMOB_ANDROID_BANNER_ID`):** `ca-app-pub-6690812959868851/5679832857` *(em builds locais sem essa variável, `monetizationBridge.ts` usa automaticamente o ID oficial de teste do Google com `isTesting: true`)*.
 
-Quando sua conta Google Play Developer for aprovada e você quiser ativar anúncios reais:
+> **Regra de proteção da conta AdMob:** nunca clique em anúncios reais ao testar no seu próprio celular; cadastre o aparelho em **AdMob → Configurações → Dispositivos de teste** para exibir anúncios de teste com segurança.
 
-1. Acesse [https://admob.google.com](https://admob.google.com) utilizando sua conta única de Publisher Google (`pub-6690812959868851` — não crie uma segunda conta AdMob/AdSense individual, pois o Google permite apenas uma conta por pessoa física).
+Checklist pós-publicação na Google Play:
+
+1. Acesse [https://admob.google.com](https://admob.google.com) utilizando sua conta única de Publisher Google (`pub-6690812959868851`).
 2. Confirme que o arquivo público [`public/app-ads.txt`](../public/app-ads.txt) já está acessível em `https://eixoverde.com/app-ads.txt` e que o site do desenvolvedor na Play Console aponta para `https://eixoverde.com`.
-3. O app **EixoVerde (Android)** já possui App ID `ca-app-pub-6690812959868851~6422068887` configurado no `AndroidManifest.xml`. Após publicar na Play Store, vincule o pacote `br.com.eixoverde.app` nas configurações do app no AdMob.
-4. No painel do AdMob, abra **Blocos de anúncios (Ad units) → Adicionar bloco de anúncios → Banner** (ex.: `EixoVerde Banner Explorar`).
-5. Copie o **ID do Bloco de Anúncios (Ad Unit ID)** no formato `ca-app-pub-6690812959868851/ZZZZZZZZZZ`.
-6. Cadastre o segredo no GitHub Actions (**Settings → Secrets and variables → Actions**) ou no `.env.local`:
-   - `VITE_ADMOB_ANDROID_BANNER_ID=ca-app-pub-6690812959868851/ZZZZZZZZZZ`
-   - *(Opcional futuro para iOS)* `VITE_ADMOB_IOS_BANNER_ID=ca-app-pub-6690812959868851/WWWWWWWWWW`
+3. Após publicar o app na Google Play, abra **Apps → EixoVerde (Android) → Configurações do app** no AdMob e vincule o pacote `br.com.eixoverde.app` à loja.
+4. *(Opcional futuro para iOS)* Cadastre `VITE_ADMOB_IOS_BANNER_ID` nos secrets do GitHub Actions quando publicar na Apple App Store.
 
-> **Importante:** O workflow `.github/workflows/mobile-build.yml` injeta automaticamente `VITE_ADMOB_ANDROID_BANNER_ID` durante o build mobile (`npm run cap:sync`) para gerar o `.aab` pronto para upload no Play Console.
+> **Importante:** O workflow `.github/workflows/mobile-build.yml` injeta automaticamente `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_MAPTILER_KEY` e `VITE_ADMOB_ANDROID_BANNER_ID` a partir dos **Repository Secrets** durante o build mobile (`npm run cap:sync`) para gerar o `.aab` pronto para upload no Play Console.
 
 ---
 
