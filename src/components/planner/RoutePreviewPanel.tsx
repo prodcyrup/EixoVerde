@@ -38,7 +38,7 @@ import { searchPlaces } from '../../engine/routing';
 import { computeRouteTelemetry } from '../../engine/telemetry';
 import { computeRouteMainBearingDeg } from '../../engine/weather';
 import { nativeShareUrl } from '../../mobile/nativeBridge';
-import { selectActiveVehicle, useAppStore } from '../../store/useAppStore';
+import { selectActiveCapital, selectActiveVehicle, useAppStore } from '../../store/useAppStore';
 import type { PlaceResult, WeatherIconKind } from '../../types';
 import { AdBanner } from '../monetization/AdBanner';
 import { ElevationProfile } from './ElevationProfile';
@@ -89,6 +89,7 @@ export function RoutePreviewPanel() {
   const isRoundTrip = useAppStore((s) => s.isRoundTrip);
   const toggleRoundTrip = useAppStore((s) => s.toggleRoundTrip);
   const activeVehicle = useAppStore(selectActiveVehicle);
+  const activeCapital = useAppStore(selectActiveCapital);
   const selectedModeIndex = useAppStore((s) => s.selectedModeIndex);
   const setModeIndex = useAppStore((s) => s.setModeIndex);
   const riderWeightKg = useAppStore((s) => s.riderWeightKg);
@@ -107,11 +108,15 @@ export function RoutePreviewPanel() {
   useEffect(() => {
     if (!editingEndpoint) return;
     const timer = setTimeout(async () => {
-      const list = await searchPlaces(endpointQuery, navPos ?? BRAND.defaultCenter);
+      const list = await searchPlaces(
+        endpointQuery,
+        navPos ?? activeCapital.center ?? BRAND.defaultCenter,
+        activeCapital.slug
+      );
       setEndpointResults(list);
     }, endpointQuery ? 240 : 0);
     return () => clearTimeout(timer);
-  }, [editingEndpoint, endpointQuery, navPos]);
+  }, [editingEndpoint, endpointQuery, navPos, activeCapital.center, activeCapital.slug]);
 
   const handleSelectEndpointPlace = (place: PlaceResult) => {
     const slot = editingEndpoint;

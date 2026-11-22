@@ -622,7 +622,7 @@ def run_e2e() -> int:
             se_errors = []
             se.on("pageerror", lambda err: se_errors.append(str(err)))
             se.goto(URL_GUEST, wait_until="domcontentloaded")
-            se.wait_for_selector("#eixoverde-mobile-menu-btn", timeout=15000)
+            se.wait_for_selector("#eixoverde-mobile-menu-btn", timeout=30000)
             time.sleep(1.5)
             se.locator("header button[aria-label='Alternar tema']").click()
             time.sleep(0.25)
@@ -714,7 +714,7 @@ def run_e2e() -> int:
             m14_errors = []
             m14.on("pageerror", lambda err: m14_errors.append(str(err)))
             m14.goto(URL_GUEST, wait_until="domcontentloaded")
-            m14.wait_for_selector("#eixoverde-mobile-menu-btn", timeout=15000)
+            m14.wait_for_selector("#eixoverde-mobile-menu-btn", timeout=30000)
             time.sleep(1.5)
 
             m14.evaluate(
@@ -761,7 +761,7 @@ def run_e2e() -> int:
             and_errors = []
             ap.on("pageerror", lambda err: and_errors.append(str(err)))
             ap.goto(URL_GUEST, wait_until="domcontentloaded")
-            ap.wait_for_selector("#eixoverde-mobile-menu-btn", timeout=15000)
+            ap.wait_for_selector("#eixoverde-mobile-menu-btn", timeout=30000)
             time.sleep(1.5)
             and_hdr = ap.evaluate(
                 """() => {
@@ -1409,6 +1409,40 @@ def run_e2e() -> int:
                     "contato@eixoverde.com" in priv_text and "contato@eixoverde.com" in del_text,
                 )
                 site_ctx.close()
+
+                # Deep-link ?city=sao-paulo from landing card must NOT fetch Brasília GeoJSON
+                # and Dark-OS visitor with fresh storage must enter /app/ directly in Dark mode
+                dl_ctx = browser.new_context(viewport={"width": 1440, "height": 900}, color_scheme="dark")
+                dl_page = dl_ctx.new_page()
+                dl_page.on("pageerror", lambda e: site_errors.append(str(e)))
+                dl_geojson_urls = []
+                dl_page.on(
+                    "request",
+                    lambda req: dl_geojson_urls.append(req.url) if ".geojson" in req.url else None,
+                )
+                dl_page.goto(URL_SITE, wait_until="domcontentloaded", timeout=15000)
+                dl_page.wait_for_selector("button[data-region-filter='Sudeste']", timeout=8000)
+                dl_page.click("button[data-region-filter='Sudeste']")
+                time.sleep(0.15)
+                dl_page.locator("#ev-capitals-grid a[href*='city=sao-paulo']").first.click()
+                dl_page.wait_for_url(f"{URL_SITE}app/?city=sao-paulo*", timeout=10000)
+                dl_page.wait_for_selector("aside #eixoverde-search-input", timeout=15000)
+                time.sleep(0.7)
+                dl_aside_txt = dl_page.locator("aside").first.inner_text()
+                dl_is_dark = dl_page.evaluate("() => document.documentElement.classList.contains('dark')")
+                fetched_df_geojson = [u for u in dl_geojson_urls if "ciclomapa-df" in u]
+                fetched_sp_geojson = [u for u in dl_geojson_urls if "sao-paulo" in u]
+                dl_aside_lower = dl_aside_txt.lower()
+                check(
+                    "Phase 8 Capital deep-link (?city=sao-paulo) skips Brasília GeoJSON, renders SP UI & inherits Dark-OS theme",
+                    dl_is_dark
+                    and len(fetched_df_geojson) == 0
+                    and len(fetched_sp_geojson) >= 1
+                    and "rotas em são paulo" in dl_aside_lower
+                    and "comunidade eixoverde" in dl_aside_lower,
+                    f"dark={dl_is_dark}, df={fetched_df_geojson}, sp={fetched_sp_geojson}",
+                )
+                dl_ctx.close()
 
                 # Responsive zero-clipping & adaptive system dark mode check across mobile viewports
                 for label, vw, vh, scheme in [

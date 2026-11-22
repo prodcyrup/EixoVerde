@@ -335,8 +335,8 @@ export function ExplorePanel() {
                   e.stopPropagation();
                   void publishSavedRouteToCommunity(route.id);
                 }}
-                aria-label="Publicar na Comunidade DF"
-                title="Publicar na Comunidade DF"
+                aria-label={activeCapital.slug === 'brasilia' ? 'Publicar na Comunidade DF' : 'Publicar na Comunidade EixoVerde'}
+                title={activeCapital.slug === 'brasilia' ? 'Publicar na Comunidade DF' : 'Publicar na Comunidade EixoVerde'}
                 className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/50"
               >
                 <Globe className="h-3.5 w-3.5" />
@@ -390,8 +390,8 @@ export function ExplorePanel() {
                   e.stopPropagation();
                   void deleteCommunityRoute(route.id);
                 }}
-                aria-label="Remover da Comunidade DF"
-                title="Remover da Comunidade DF"
+                aria-label={activeCapital.slug === 'brasilia' ? 'Remover da Comunidade DF' : 'Remover da Comunidade EixoVerde'}
+                title={activeCapital.slug === 'brasilia' ? 'Remover da Comunidade DF' : 'Remover da Comunidade EixoVerde'}
                 className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/50"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -528,7 +528,11 @@ export function ExplorePanel() {
             value={query}
             onFocus={() => setSearchFocused(true)}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Para onde vamos? (DF ou Brasil)"
+            placeholder={
+              activeCapital.slug === 'brasilia'
+                ? 'Para onde vamos? (DF ou Brasil)'
+                : `Para onde vamos? (${activeCapital.name} ou Brasil)`
+            }
             className="w-full bg-transparent text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-white"
           />
           {query && (
@@ -768,7 +772,7 @@ export function ExplorePanel() {
             <div className="flex items-center justify-between px-0.5">
               <h2 className="inline-flex items-center gap-1 text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 <Users className="h-3 w-3 text-emerald-600" />
-                Comunidade DF ({communityRoutes.length})
+                {activeCapital.slug === 'brasilia' ? 'Comunidade DF' : 'Comunidade EixoVerde'} ({communityRoutes.length})
               </h2>
             </div>
             {communityRoutes.length > 0 ? (

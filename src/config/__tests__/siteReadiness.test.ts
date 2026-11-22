@@ -94,4 +94,37 @@ describe('Phase 8 — eixoverde.com Domain, Website & Store Readiness', () => {
     expect(forbidden.test(css)).toBe(false);
     expect(forbidden.test(js)).toBe(false);
   });
+
+  it('keeps source comments, Play Store PT-BR kit, and native metadata free of forbidden brand names and Play-ready', () => {
+    const forbidden = /\b(waze|komoot|google\s+maps|strava|uber)\b/i;
+    const filesToAudit = [
+      'src/components/planner/ElevationProfile.tsx',
+      'src/engine/gpx.ts',
+      'src/engine/routing.ts',
+      'ios/App/App/Info.plist',
+      'docs/PLAY_STORE_LISTING_PTBR.md',
+      'docs/MOBILE_STORES_SETUP.md',
+    ];
+    for (const relPath of filesToAudit) {
+      expect(forbidden.test(readRepoFile(relPath)), `Forbidden brand found in ${relPath}`).toBe(false);
+    }
+
+    const playKit = readRepoFile('docs/PLAY_STORE_LISTING_PTBR.md');
+    expect(playKit).toContain('br.com.eixoverde.app');
+    expect(playKit).toContain('eixoverde_vip_lifetime');
+    expect(playKit).toContain('R$ 9,90');
+    expect(playKit).toContain('contato@eixoverde.com');
+    expect(playKit).toContain('https://eixoverde.com/privacidade.html');
+    expect(playKit).toContain('https://eixoverde.com/exclusao-conta.html');
+    expect(playKit).toContain('ca-app-pub-6690812959868851~6422068887');
+    expect(playKit).toContain('ca-app-pub-6690812959868851/5679832857');
+
+    const gradle = readRepoFile('android/app/build.gradle');
+    expect(gradle).toContain('versionName "1.0.0"');
+    expect(gradle).toContain('ANDROID_VERSION_CODE');
+    expect(gradle).toContain('ANDROID_KEYSTORE_PATH');
+
+    const appIndexHtml = readRepoFile('index.html');
+    expect(appIndexHtml).toContain('prefers-color-scheme: dark');
+  });
 });

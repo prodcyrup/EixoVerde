@@ -71,7 +71,7 @@
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>O EixoVerde utiliza sua localização para mostrar ciclovias próximas, guiar você curva a curva com segurança e registrar a telemetria dos seus pedais.</string>
+	<string>O EixoVerde utiliza sua localização para mostrar ciclovias próximas, guiar você curva a curva com segurança e registrar a telemetria dos seus trajetos.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>O EixoVerde utiliza sua localização durante a navegação ativa para manter as instruções de voz e o registro do trajeto precisos.</string>
 	<key>CFBundleURLTypes</key>

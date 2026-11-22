@@ -449,7 +449,7 @@ export async function planMultiProfileRoutes(
 
 /**
  * Autocomplete geocoding across all 27 Brazilian State Capitals (biased toward active capital / user viewport)
- * combining curated city landmarks + Komoot Photon API + Nominatim Brazil fallback.
+ * combining curated city landmarks + Photon OSM geocoder + Nominatim Brazil fallback.
  */
 export async function searchPlaces(
   query: string,

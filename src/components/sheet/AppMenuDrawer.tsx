@@ -80,11 +80,23 @@ export function AppMenuDrawer() {
   if (!open) return null;
 
   const supabaseEnabled = hasSupabaseConfig();
-  const locationParts = [currentLocationPlace?.district, currentLocationPlace?.city].filter(Boolean);
-  const locationLabel =
-    locationParts.length > 0
-      ? locationParts.join(', ')
-      : currentLocationPlace?.city || activeCapital.label;
+  const gpsMatchesCapital = Boolean(
+    currentLocationPlace?.city &&
+      currentLocationPlace.city
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .includes(
+          activeCapital.name
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+        )
+  );
+  const locationParts = gpsMatchesCapital
+    ? [currentLocationPlace?.district, currentLocationPlace?.city].filter(Boolean)
+    : [];
+  const locationLabel = locationParts.length > 0 ? locationParts.join(', ') : activeCapital.label;
   const versionSubtitle = `${locationLabel} • v${__APP_VERSION__}`;
 
   const getSyncBadgeMeta = () => {

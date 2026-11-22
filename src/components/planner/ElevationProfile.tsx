@@ -75,7 +75,7 @@ export function ElevationProfile({ route }: ElevationProfileProps) {
 
   return (
     <div className="space-y-3">
-      {/* Komoot-style Surface / Way-Type Stacked Bar */}
+      {/* Surface / Way-Type Stacked Bar */}
       <div>
         <div className="mb-1.5 flex items-center justify-between text-xs">
           <span className="font-semibold text-slate-700 dark:text-slate-200">Infraestrutura da Rota</span>

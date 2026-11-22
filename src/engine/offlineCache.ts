@@ -71,6 +71,36 @@ export async function checkOfflineDfCacheStatus(
 }
 
 /**
+ * Fetches a GeoJSON dataset over the network and transparently falls back to
+ * the pre-warmed Cache API entry when offline or in airplane mode.
+ */
+export async function fetchGeoJsonWithOfflineFallback(
+  url: string
+): Promise<GeoJSON.FeatureCollection | null> {
+  try {
+    const res = await fetch(url);
+    if (res.ok) {
+      return (await res.json()) as GeoJSON.FeatureCollection;
+    }
+  } catch {
+    // Offline or network error — fall back to pre-warmed offline cache below
+  }
+
+  if (typeof caches !== 'undefined') {
+    try {
+      const cache = await caches.open(OFFLINE_CACHE_NAME);
+      const cached = await cache.match(url);
+      if (cached) {
+        return (await cached.json()) as GeoJSON.FeatureCollection;
+      }
+    } catch {
+      // Ignore Cache API read errors
+    }
+  }
+  return null;
+}
+
+/**
  * Pre-warms the selected capital's CicloMapa bike-lane network, shared station/POI dataset,
  * app icon, and fallback vector style into the browser Cache API for 100% offline rides.
  */
@@ -96,6 +126,12 @@ export async function warmOfflineDfCache(
         }
       })
     );
+  } catch {
+    // Graceful fallback when completely offline
+  }
+
+  const status = await checkOfflineDfCacheStatus(baseUrl, cap.slug);
+  if (status.ready) {
     const nowIso = new Date().toISOString();
     try {
       if (typeof localStorage !== 'undefined') {
@@ -112,13 +148,12 @@ export async function warmOfflineDfCache(
         }
       }
     } catch {
-      // Ignore
+      // Ignore storage errors
     }
-  } catch {
-    // Graceful fallback when completely offline
+    return { ...status, lastUpdatedAt: nowIso };
   }
 
-  return checkOfflineDfCacheStatus(baseUrl, cap.slug);
+  return status;
 }
 
 export function getCachedOfflineCitySlugs(): string[] {

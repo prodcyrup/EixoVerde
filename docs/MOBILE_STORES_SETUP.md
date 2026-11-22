@@ -62,12 +62,15 @@ O workflow `.github/workflows/mobile-build.yml` (**Build EixoVerde Mobile (Andro
 2. Baixe o artefato **`EixoVerde-Android-Debug-APK`** para instalar e testar diretamente em qualquer celular Android (`app-debug.apk`).
 3. Para publicação no **Google Play Console**, utilize o artefato **`EixoVerde-Android-Release-AAB`** assinado com sua chave de upload (`keystore`).
 
-### Assinatura do `.aab` para Google Play Store
-Para assinar localmente um bundle de produção para a Google Play Store:
-```bash
-keytool -genkey -v -keystore eixoverde-upload-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias eixoverde
-```
-Abra a pasta `android/` no Android Studio → **Build** → **Generate Signed Bundle / APK** → **Android App Bundle (`.aab`)** e selecione o arquivo `.jks`.
+### Assinatura Automatizada do `.aab` no GitHub Actions (Sem Android Studio)
+O arquivo `android/app/build.gradle` e o workflow `.github/workflows/mobile-build.yml` suportam assinatura automática do `app-release.aab` quando os 4 secrets abaixo estão cadastrados no repositório:
+- `ANDROID_KEYSTORE_BASE64` (conteúdo em Base64 do arquivo `.jks` gerado via `keytool`)
+- `ANDROID_KEYSTORE_PASSWORD`
+- `ANDROID_KEY_ALIAS` (ex.: `eixoverde`)
+- `ANDROID_KEY_PASSWORD`
+
+Para instruções passo a passo de geração do `.jks`, preenchimento completo da ficha da loja em PT-BR, formulário de **Segurança dos Dados (Data Safety)** e cadastro do produto VIP (`eixoverde_vip_lifetime`), consulte:
+- **`docs/PLAY_STORE_LISTING_PTBR.md`**
 
 ---
 

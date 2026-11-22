@@ -16,6 +16,8 @@ const GOOGLE_TEST_BANNER_IOS = 'ca-app-pub-3940256099942544/2934735716';
 
 let admobInitialized = false;
 let nativeBannerVisible = false;
+let bannerDesired = false;
+let bannerIntentSeq = 0;
 
 export function getConfiguredAdMobBannerId(): { adId: string; isTesting: boolean } {
   const platform = getRuntimePlatform();
@@ -46,9 +48,12 @@ export async function initNativeAdMob(): Promise<boolean> {
 }
 
 export async function showNativeAdBanner(): Promise<boolean> {
-  if (!isNativeMobileApp() || nativeBannerVisible) return false;
+  if (!isNativeMobileApp()) return false;
+  const seq = ++bannerIntentSeq;
+  bannerDesired = true;
   const ready = await initNativeAdMob();
-  if (!ready) return false;
+  if (!ready || !bannerDesired || seq !== bannerIntentSeq) return false;
+  if (nativeBannerVisible) return true;
   try {
     const { adId, isTesting } = getConfiguredAdMobBannerId();
     await AdMob.showBanner({
@@ -58,6 +63,15 @@ export async function showNativeAdBanner(): Promise<boolean> {
       margin: 0,
       isTesting,
     });
+    if (!bannerDesired || seq !== bannerIntentSeq) {
+      try {
+        await AdMob.hideBanner();
+      } catch {
+        // Ignore cleanup hide error
+      }
+      nativeBannerVisible = false;
+      return false;
+    }
     nativeBannerVisible = true;
     return true;
   } catch {
@@ -66,13 +80,16 @@ export async function showNativeAdBanner(): Promise<boolean> {
 }
 
 export async function hideNativeAdBanner(): Promise<void> {
-  if (!isNativeMobileApp() || !nativeBannerVisible) return;
+  bannerDesired = false;
+  bannerIntentSeq += 1;
+  if (!isNativeMobileApp()) return;
+  const wasVisible = nativeBannerVisible;
+  nativeBannerVisible = false;
+  if (!wasVisible && !admobInitialized) return;
   try {
     await AdMob.hideBanner();
   } catch {
-    // Ignore hide errors when view detached
-  } finally {
-    nativeBannerVisible = false;
+    // Ignore hide errors when view detached or banner not yet shown
   }
 }
 

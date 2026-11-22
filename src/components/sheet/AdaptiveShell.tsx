@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { BRAND } from '../../config/brand';
 import { useFullscreen } from '../../hooks/useFullscreen';
-import { selectActiveVehicle, useAppStore } from '../../store/useAppStore';
+import { selectActiveCapital, selectActiveVehicle, useAppStore } from '../../store/useAppStore';
 import { RoutePreviewPanel } from '../planner/RoutePreviewPanel';
 import { ExplorePanel } from '../search/ExplorePanel';
 
@@ -74,6 +74,7 @@ export function AdaptiveShell() {
   const showBikeLanes = useAppStore((s) => s.showBikeLanes);
   const mapPickTarget = useAppStore((s) => s.mapPickTarget);
   const activeVehicle = useAppStore(selectActiveVehicle);
+  const activeCapital = useAppStore(selectActiveCapital);
   const authUser = useAppStore((s) => s.authUser);
   const syncStatus = useAppStore((s) => s.syncStatus);
 
@@ -110,7 +111,7 @@ export function AdaptiveShell() {
     if (found) {
       flyTo(found.coords, 15.6);
     } else {
-      flyTo(BRAND.defaultCenter, 13.5);
+      flyTo(activeCapital.center, activeCapital.zoom);
     }
   };
 
@@ -437,7 +438,7 @@ export function AdaptiveShell() {
               </div>
               <div className="mt-1 border-t border-slate-200/70 pt-1.5 dark:border-slate-700/70">
                 <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                  <span className="h-2.5 w-2.5 rounded-full bg-orange-500" /> Estação Bike Brasília (Tembici)
+                  <span className="h-2.5 w-2.5 rounded-full bg-orange-500" /> Estação {activeCapital.bikeShareBrand}
                 </div>
                 <div className="mt-1 flex items-center gap-2 text-slate-600 dark:text-slate-300">
                   <span className="h-2.5 w-2.5 rounded-full bg-sky-600" /> Hub Patinete JET

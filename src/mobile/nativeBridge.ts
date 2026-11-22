@@ -19,6 +19,7 @@ export interface ParsedDeepLink {
   authCode?: string;
   authType?: string;
   shareParam?: string;
+  citySlug?: string;
 }
 
 export function isNativeMobileApp(): boolean {
@@ -41,8 +42,8 @@ export function getRuntimePlatform(): RuntimePlatform {
 
 /**
  * Parses a custom scheme (`br.com.eixoverde.app://auth-callback#access_token=...`)
- * or universal link (`https://eixoverde.com/app/?share=...`) into
- * structured auth tokens or shared route parameters.
+ * or universal link (`https://eixoverde.com/app/?share=...` or `?city=...`) into
+ * structured auth tokens, shared route parameters, or capital city slugs.
  */
 export function parseDeepLinkUrl(rawUrl: string): ParsedDeepLink | null {
   const trimmed = (rawUrl || '').trim();
@@ -64,8 +65,10 @@ export function parseDeepLinkUrl(rawUrl: string): ParsedDeepLink | null {
     const authCode = searchParams.get('code') ?? hashParams.get('code') ?? undefined;
     const authType = hashParams.get('type') ?? searchParams.get('type') ?? undefined;
     const shareParam = searchParams.get('share') ?? hashParams.get('share') ?? undefined;
+    const rawCity = searchParams.get('city') ?? hashParams.get('city') ?? undefined;
+    const citySlug = rawCity?.trim().toLowerCase() || undefined;
 
-    if (!accessToken && !authCode && !shareParam && !authType) {
+    if (!accessToken && !authCode && !shareParam && !authType && !citySlug) {
       return null;
     }
 
@@ -76,6 +79,7 @@ export function parseDeepLinkUrl(rawUrl: string): ParsedDeepLink | null {
       authCode,
       authType,
       shareParam,
+      citySlug,
     };
   } catch {
     return null;
