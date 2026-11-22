@@ -4,6 +4,7 @@ import { getMapStyle } from '../../config/providers';
 import { getCapitalBySlug } from '../../data/brazilCities';
 import { buildMobilityStationsCollection } from '../../data/mobilityStations';
 import { buildLaneSpatialIndex, normalizeAngleDiff } from '../../engine/geo';
+import { fetchGeoJsonWithOfflineFallback } from '../../engine/offlineCache';
 import { buildSafetyRouteSegments } from '../../engine/routeSegments';
 import { useAppStore } from '../../store/useAppStore';
 import type { LngLat } from '../../types';
@@ -23,7 +24,10 @@ export function EixoVerdeMap() {
   const styleReadyRef = useRef(false);
   const lanesDataRef = useRef<GeoJSON.FeatureCollection | null>(null);
   const poisDataRef = useRef<GeoJSON.FeatureCollection | null>(null);
-  const stationsDataRef = useRef<GeoJSON.FeatureCollection>(buildMobilityStationsCollection(null).geojson);
+  const initialCity = getCapitalBySlug(useAppStore.getState().selectedCitySlug);
+  const stationsDataRef = useRef<GeoJSON.FeatureCollection>(
+    buildMobilityStationsCollection(null, initialCity.slug, initialCity.bikeShareBrand).geojson
+  );
 
   const waypointMarkersRef = useRef<maplibregl.Marker[]>([]);
   const crossingMarkersRef = useRef<maplibregl.Marker[]>([]);
@@ -557,7 +561,7 @@ export function EixoVerdeMap() {
           {
             id: props.id || `station-${Date.now()}`,
             name: props.name || 'Estação de Mobilidade',
-            subtitle: props.subtitle || 'Brasília, DF',
+            subtitle: props.subtitle || activeCap.label,
             coords,
             source: 'curated',
           },
@@ -596,6 +600,7 @@ export function EixoVerdeMap() {
       const feat = e.features?.[0];
       if (!feat) return;
       const props = feat.properties as { name?: string; label?: string; kind?: string };
+      const activeCap = getCapitalBySlug(st.selectedCitySlug);
       const root = document.createElement('div');
       root.style.cssText = 'font-family:Inter,sans-serif;padding:2px 0';
       const badgeEl = document.createElement('div');
@@ -603,7 +608,7 @@ export function EixoVerdeMap() {
       badgeEl.textContent = props.label || 'Ciclovia';
       const titleEl = document.createElement('div');
       titleEl.style.cssText = 'font-size:12px;font-weight:600;color:#0f172a';
-      titleEl.textContent = props.name || 'Malha Cicloviária DF';
+      titleEl.textContent = props.name || `Malha Cicloviária ${activeCap.stateCode}`;
       root.appendChild(badgeEl);
       root.appendChild(titleEl);
       new maplibregl.Popup({ closeButton: false, maxWidth: '230px', offset: 10 })
@@ -739,8 +744,8 @@ export function EixoVerdeMap() {
         : `${baseUrl}${cap.poisUrl}`;
 
     Promise.all([
-      fetch(lanesUrl).then((r) => (r.ok ? r.json() : null)),
-      fetch(poisUrl).then((r) => (r.ok ? r.json() : null)),
+      fetchGeoJsonWithOfflineFallback(lanesUrl),
+      fetchGeoJsonWithOfflineFallback(poisUrl),
     ])
       .then(([lanes, pois]) => {
         if (cancelled) return;

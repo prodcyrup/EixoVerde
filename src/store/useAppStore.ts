@@ -13,7 +13,6 @@ import {
   updatePassword,
 } from '../cloud/authService';
 import { subscribeRealtimeHazards } from '../cloud/realtimeHazards';
-import { BRAND } from '../config/brand';
 import { hasSupabaseConfig } from '../config/providers';
 import {
   BRAZIL_CAPITALS,
@@ -369,7 +368,23 @@ export function selectActiveCapital(state: AppStore): BrazilCapitalCity {
 
 const CITY_STORAGE_KEY = 'eixoverde:city';
 
+function getUrlCitySlugParam(): string | null {
+  try {
+    if (typeof window !== 'undefined' && window.location?.search) {
+      const cityParam = new URLSearchParams(window.location.search).get('city')?.trim().toLowerCase();
+      if (cityParam && BRAZIL_CAPITALS.some((c) => c.slug === cityParam)) {
+        return cityParam;
+      }
+    }
+  } catch {
+    // Ignore URL parsing errors
+  }
+  return null;
+}
+
 function getInitialCitySlug(): string {
+  const urlCity = getUrlCitySlugParam();
+  if (urlCity) return urlCity;
   try {
     if (typeof localStorage !== 'undefined') {
       const saved = localStorage.getItem(CITY_STORAGE_KEY);
@@ -421,21 +436,40 @@ function savedRouteToCandidate(route: SavedRoute): RouteCandidate {
 
 const THEME_STORAGE_KEY = 'eixoverde:theme';
 
-function getInitialTheme(): ThemeMode {
+function getStoredThemeOverride(): ThemeMode | null {
   try {
     if (typeof localStorage !== 'undefined') {
       const saved = localStorage.getItem(THEME_STORAGE_KEY);
       if (saved === 'dark' || saved === 'light') {
-        if (typeof document !== 'undefined') {
-          document.documentElement.classList.toggle('dark', saved === 'dark');
-        }
         return saved;
       }
     }
   } catch {
-    // Fallback to light
+    // Ignore storage errors
   }
-  return 'light';
+  return null;
+}
+
+function getInitialTheme(): ThemeMode {
+  const stored = getStoredThemeOverride();
+  let resolved: ThemeMode = stored ?? 'light';
+  if (!stored) {
+    try {
+      if (
+        typeof window !== 'undefined' &&
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(prefers-color-scheme: dark)').matches
+      ) {
+        resolved = 'dark';
+      }
+    } catch {
+      // Fallback to light
+    }
+  }
+  if (typeof document !== 'undefined') {
+    document.documentElement.classList.toggle('dark', resolved === 'dark');
+  }
+  return resolved;
 }
 
 function syncPersistTheme(theme: ThemeMode): void {
@@ -588,7 +622,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       indexedDbStorage.getRouteRatings(),
     ]);
 
-    const theme: ThemeMode = prefs.theme ?? get().theme ?? 'light';
+    const theme: ThemeMode = getStoredThemeOverride() ?? prefs.theme ?? get().theme ?? 'light';
     syncPersistTheme(theme);
     if (typeof document !== 'undefined') {
       document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -596,7 +630,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     void configureNativeStatusBar(theme);
 
     const selectedCitySlug = getCapitalBySlug(
-      prefs.selectedCitySlug ?? get().selectedCitySlug ?? 'brasilia'
+      getUrlCitySlugParam() ?? prefs.selectedCitySlug ?? get().selectedCitySlug ?? 'brasilia'
     ).slug;
     syncPersistCitySlug(selectedCitySlug);
     const cityCurated = getCuratedRoutesForCity(selectedCitySlug);
@@ -1201,6 +1235,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
               get().pushToast('Rota compartilhada aberta', sharedRoute.name, 'emerald');
             }
           }
+          if (parsed.citySlug && BRAZIL_CAPITALS.some((c) => c.slug === parsed.citySlug)) {
+            await get().selectCity(parsed.citySlug, true);
+          }
         })();
       },
     });
@@ -1222,17 +1259,22 @@ export const useAppStore = create<AppStore>((set, get) => ({
     }
 
     // Check if opened from eixoverde.com with an explicit capital deep-link (?city=sao-paulo)
-    let deepLinkedCity = false;
-    if (typeof window !== 'undefined' && window.location?.search) {
-      const cityParam = new URLSearchParams(window.location.search).get('city')?.trim().toLowerCase();
-      if (cityParam && BRAZIL_CAPITALS.some((c) => c.slug === cityParam)) {
-        deepLinkedCity = true;
-        await get().selectCity(cityParam, true);
+    const urlCity = getUrlCitySlugParam();
+    if (urlCity) {
+      const deepCap = getCapitalBySlug(urlCity);
+      if (get().selectedCitySlug !== deepCap.slug) {
+        await get().selectCity(deepCap.slug, true);
+      } else {
+        get().pushToast(
+          `Explorar ${deepCap.label}`,
+          `${deepCap.totalKm} km de malha cicloviária • Região ${deepCap.region}`,
+          'emerald'
+        );
       }
     }
 
     // Automatically locate user's real GPS position on startup so Point A is always accurate
-    void get().locateCurrentPosition({ silent: true, flyToUser: !deepLinkedCity && activeCap.slug === 'brasilia' });
+    void get().locateCurrentPosition({ silent: true, flyToUser: !urlCity && activeCap.slug === 'brasilia' });
   },
 
   async refreshWeather(coords) {
@@ -1240,7 +1282,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       coords ??
       get().candidates[get().selectedCandidateIdx]?.waypoints[0] ??
       get().nav.currentPos ??
-      BRAND.defaultCenter;
+      getCapitalBySlug(get().selectedCitySlug).center;
     set({ weatherLoading: true });
     const snapshot = await fetchLiveWeather(target);
     set((s) => ({
@@ -1253,7 +1295,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     void hideNativeAdBanner();
     const state = get();
     const vehicle = selectActiveVehicle(state);
-    const startPos = state.nav.currentPos ?? BRAND.defaultCenter;
+    const startPos = state.nav.currentPos ?? getCapitalBySlug(state.selectedCitySlug).center;
     const rec = createRideRecording({
       mode: 'free_ride',
       vehicle,
@@ -1390,7 +1432,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   async saveRideAsRoute(id) {
     const ride = get().rideSessions.find((r) => r.id === id);
     if (!ride) return;
-    const route = rideSessionToSavedRoute(ride);
+    const cityLabel = getCapitalBySlug(get().selectedCitySlug).label;
+    const route = rideSessionToSavedRoute(ride, cityLabel);
     if (!route) {
       get().pushToast('Trajeto muito curto', 'É preciso ao menos 2 pontos GPS para criar uma rota.', 'amber');
       return;
@@ -1597,20 +1640,21 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   async publishSavedRouteToCommunity(routeId) {
+    const communityLabel = get().selectedCitySlug === 'brasilia' ? 'Comunidade DF' : 'Comunidade EixoVerde';
     const user = get().authUser;
     if (!user) {
       set({ authModalOpen: true });
-      get().pushToast('Entre para publicar na Comunidade DF', 'Sua conta gratuita permite compartilhar rotas.', 'amber');
+      get().pushToast(`Entre para publicar na ${communityLabel}`, 'Sua conta gratuita permite compartilhar rotas.', 'amber');
       return;
     }
     const route = get().savedRoutes.find((r) => r.id === routeId);
     if (!route) return;
-    const authorName = user.displayName || user.email.split('@')[0] || 'Ciclista DF';
+    const authorName = user.displayName || user.email.split('@')[0] || 'Ciclista EixoVerde';
     try {
       const published = await supabaseAdapter.publishCommunityRoute(user.id, route, authorName);
       if (!published) {
         get().pushToast(
-          'Comunidade DF indisponível',
+          `${communityLabel} indisponível`,
           'Verifique se a migração SQL da Fase 4 foi aplicada no Supabase.',
           'amber'
         );
@@ -1619,13 +1663,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
       set((s) => ({
         communityRoutes: [published, ...s.communityRoutes.filter((r) => r.id !== published.id)],
       }));
-      get().pushToast('Rota publicada na Comunidade DF!', published.name, 'emerald');
+      get().pushToast(`Rota publicada na ${communityLabel}!`, published.name, 'emerald');
     } catch {
       get().pushToast('Falha ao publicar rota', 'Tente novamente quando a conexão estabilizar.', 'rose');
     }
   },
 
   async deleteCommunityRoute(routeId) {
+    const communityLabel = get().selectedCitySlug === 'brasilia' ? 'Comunidade DF' : 'Comunidade EixoVerde';
     const user = get().authUser;
     if (!user) return;
     try {
@@ -1633,7 +1678,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       set((s) => ({
         communityRoutes: s.communityRoutes.filter((r) => r.id !== routeId),
       }));
-      get().pushToast('Rota removida da Comunidade DF', undefined, 'slate');
+      get().pushToast(`Rota removida da ${communityLabel}`, undefined, 'slate');
     } catch {
       get().pushToast('Não foi possível remover', 'Tente novamente em instantes.', 'rose');
     }
@@ -1773,13 +1818,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
           }
         }
 
+        const activeCap = getCapitalBySlug(get().selectedCitySlug);
         set({
           origin:
             resolvedOrigin ?? {
-              id: 'default-bsb-origin',
-              name: 'Centro de Brasília (GPS indisponível)',
+              id: `default-${activeCap.slug}-origin`,
+              name: `Centro de ${activeCap.name} (GPS indisponível)`,
               subtitle: 'Toque no Ponto A para definir sua partida',
-              coords: BRAND.defaultCenter,
+              coords: activeCap.center,
               source: 'curated',
             },
         });
@@ -1990,7 +2036,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           : cand.distanceKm > 10
             ? 'Moderado'
             : 'Fácil',
-      city: 'Brasil',
+      city: getCapitalBySlug(get().selectedCitySlug).label,
       profile: cand.profile,
       coords: cand.coords,
       waypoints: cand.waypoints,
@@ -2312,12 +2358,13 @@ export const useAppStore = create<AppStore>((set, get) => ({
   },
 
   openHazardReporter(coords) {
-    const pos = coords ?? get().nav.currentPos ?? BRAND.defaultCenter;
+    const pos = coords ?? get().nav.currentPos ?? getCapitalBySlug(get().selectedCitySlug).center;
     set({ pendingHazardCoords: pos, hazardPickerOpen: true });
   },
 
   async submitHazard(kind, title, note) {
-    const coords = get().pendingHazardCoords ?? get().nav.currentPos ?? BRAND.defaultCenter;
+    const coords =
+      get().pendingHazardCoords ?? get().nav.currentPos ?? getCapitalBySlug(get().selectedCitySlug).center;
     const now = new Date().toISOString();
     const authUser = get().authUser;
     const report: HazardReport = {

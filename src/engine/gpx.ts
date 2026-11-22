@@ -3,7 +3,7 @@ import type { Coord3D, LngLat, SavedRoute } from '../types';
 import { computeElevationStats, computePathDistanceKm, computeSurfaceBreakdown } from './geo';
 
 /**
- * Generates a standard Komoot/Strava-compatible GPX 1.1 document from any route.
+ * Generates a standard GPX 1.1 document from any route.
  */
 export function exportRouteToGpx(name: string, coords: Coord3D[], description = ''): string {
   const safeName = escapeXml(name);

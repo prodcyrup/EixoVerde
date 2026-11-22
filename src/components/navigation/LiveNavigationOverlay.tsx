@@ -26,6 +26,7 @@ import {
   X,
 } from 'lucide-react';
 import { BRAND } from '../../config/brand';
+import { getCapitalBySlug } from '../../data/brazilCities';
 import {
   buildCumulativeDistances,
   formatDistancePtBR,
@@ -138,7 +139,13 @@ export function LiveNavigationOverlay() {
       if (!st.activeRide) return;
       const now = Date.now();
       if (now - st.activeRide.lastTickMs >= 950) {
-        const pos = st.nav.currentPos ?? BRAND.defaultCenter;
+        const lastPt = st.activeRide.track[st.activeRide.track.length - 1];
+        const fallbackCenter = getCapitalBySlug(st.selectedCitySlug).center;
+        const pos: [number, number] = st.nav.currentPos
+          ? st.nav.currentPos
+          : lastPt
+            ? [lastPt.lng, lastPt.lat]
+            : fallbackCenter;
         recordRideSample({
           lng: pos[0],
           lat: pos[1],

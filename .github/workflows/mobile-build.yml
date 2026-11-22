@@ -2,6 +2,11 @@ name: Build EixoVerde Mobile (Android APK & AAB)
 
 on:
   workflow_dispatch:
+    inputs:
+      version_code:
+        description: 'Android versionCode (inteiro positivo para Google Play)'
+        required: false
+        default: '1'
   push:
     branches:
       - main
@@ -49,16 +54,37 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || vars.VITE_SUPABASE_ANON_KEY }}
           VITE_MAPTILER_KEY: ${{ secrets.VITE_MAPTILER_KEY || vars.VITE_MAPTILER_KEY }}
-          VITE_ADMOB_ANDROID_BANNER_ID: ${{ secrets.VITE_ADMOB_ANDROID_BANNER_ID }}
+          VITE_ADMOB_ANDROID_BANNER_ID: ${{ secrets.VITE_ADMOB_ANDROID_BANNER_ID || vars.VITE_ADMOB_ANDROID_BANNER_ID }}
         run: |
           npm run build:mobile
           npx cap sync android
 
+      - name: Decode Optional Play Store Upload Keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '\n\r ' | base64 -d > /tmp/eixoverde-upload.jks
+            echo "ANDROID_KEYSTORE_PATH=/tmp/eixoverde-upload.jks" >> "$GITHUB_ENV"
+            echo "Signing mode: RELEASE SIGNED AAB"
+          else
+            echo "Signing mode: UNSIGNED AAB (configure ANDROID_KEYSTORE_BASE64 secret for Play Console upload)"
+          fi
+
       - name: Build Android Debug APK & Release Bundle (AAB)
         working-directory: android
+        env:
+          ANDROID_VERSION_CODE: ${{ github.event.inputs.version_code || vars.ANDROID_VERSION_CODE || '1' }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug bundleRelease --no-daemon
+
+      - name: Cleanup Temporary Keystore
+        if: always()
+        run: rm -f /tmp/eixoverde-upload.jks
 
       - name: Upload Android Debug APK Artifact (Ready to Install on Phone)
         uses: actions/upload-artifact@v4

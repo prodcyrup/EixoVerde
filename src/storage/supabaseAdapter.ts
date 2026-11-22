@@ -643,13 +643,17 @@ export const supabaseAdapter = {
 
     const now = new Date().toISOString();
     const id = route.id.startsWith('comm-') ? route.id : `comm-${route.id}`;
+    const communityTag =
+      route.city && !route.city.includes('DF') && !route.city.includes('Brasília')
+        ? `Comunidade ${route.city.split(',')[0].trim()}`
+        : 'Comunidade DF';
     const payload = {
       id,
       author_id: userId,
-      author_name: authorName || 'Ciclista DF',
+      author_name: authorName || 'Ciclista EixoVerde',
       name: route.name,
       description: route.description ?? null,
-      tag: 'Comunidade DF',
+      tag: communityTag,
       difficulty: route.difficulty || 'Fácil',
       city: route.city || 'Brasília, DF',
       profile: route.profile || 'safe',
@@ -680,9 +684,9 @@ export const supabaseAdapter = {
       return {
         ...route,
         id,
-        tag: 'Comunidade DF',
+        tag: communityTag,
         authorId: userId,
-        authorName: authorName || 'Ciclista DF',
+        authorName: authorName || 'Ciclista EixoVerde',
         avgRating: 0,
         ratingCount: 0,
         safetyTags: [],

@@ -409,7 +409,10 @@ export function computeLifetimeRideStats(rides: RideSession[]): LifetimeRideStat
 /**
  * Promotes a recorded RideSession into a reusable SavedRoute in 'Rotas Salvas'.
  */
-export function rideSessionToSavedRoute(ride: RideSession): SavedRoute | null {
+export function rideSessionToSavedRoute(
+  ride: RideSession,
+  cityLabel = 'Brasília, DF'
+): SavedRoute | null {
   if (!ride.track || ride.track.length < 2) return null;
   const coords: Coord3D[] = ride.track.map((pt) =>
     typeof pt.ele === 'number' ? [pt.lng, pt.lat, pt.ele] : [pt.lng, pt.lat]
@@ -434,7 +437,7 @@ export function rideSessionToSavedRoute(ride: RideSession): SavedRoute | null {
         : ride.distanceKm > 10
           ? 'Moderado'
           : 'Fácil',
-    city: 'Brasília, DF',
+    city: cityLabel,
     profile: 'safe',
     coords,
     waypoints: [first, last],

@@ -43,6 +43,13 @@ describe('nativeBridge.ts — Deep-Link Parser & Runtime Detection', () => {
     expect(legacy?.shareParam).toBe('eyJ2IjoxfQ==');
   });
 
+  it('parses capital city deep links (?city=...) from eixoverde.com/app/ universal URLs', () => {
+    const parsed = parseDeepLinkUrl('https://eixoverde.com/app/?city=Sao-Paulo');
+    expect(parsed).not.toBeNull();
+    expect(parsed?.citySlug).toBe('sao-paulo');
+    expect(parsed?.shareParam).toBeUndefined();
+  });
+
   it('returns null gracefully on empty or irrelevant URLs', () => {
     expect(parseDeepLinkUrl('   ')).toBeNull();
     expect(parseDeepLinkUrl('https://eixoverde.com/')).toBeNull();

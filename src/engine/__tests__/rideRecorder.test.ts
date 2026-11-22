@@ -74,6 +74,10 @@ describe('rideRecorder.ts GPS auto-pause, telemetry & GPX export', () => {
     const route = rideSessionToSavedRoute(finalized);
     expect(route).not.toBeNull();
     expect(route?.coords.length).toBe(finalized.track.length);
+    expect(route?.city).toBe('Brasília, DF');
+
+    const spRoute = rideSessionToSavedRoute(finalized, 'São Paulo, SP');
+    expect(spRoute?.city).toBe('São Paulo, SP');
 
     const gpx = exportRideToGpx(finalized);
     expect(gpx).toContain('<gpx version="1.1"');
