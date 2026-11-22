@@ -148,7 +148,7 @@ export function EixoVerdeMap() {
       });
     }
 
-    // 3. Dedicated Ciclovias & Ciclofaixas (casing + bright core)
+    // 3. Dedicated Ciclovias & Ciclofaixas (casing + bright lime-green core to contrast clearly with emerald active routes)
     if (!map.getLayer('ev-lanes-dedicated-casing')) {
       map.addLayer({
         id: 'ev-lanes-dedicated-casing',
@@ -157,7 +157,7 @@ export function EixoVerdeMap() {
         filter: ['in', ['get', 'kind'], ['literal', ['ciclovia', 'ciclofaixa']]],
         layout: { 'line-cap': 'round', 'line-join': 'round', visibility: laneVis },
         paint: {
-          'line-color': isDark ? '#022c22' : '#ffffff',
+          'line-color': isDark ? '#1a2e05' : '#ffffff',
           'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2.5, 14, 5.2, 17, 7.5],
           'line-opacity': 0.78,
         },
@@ -177,10 +177,10 @@ export function EixoVerdeMap() {
             ['get', 'kind'],
             'ciclofaixa',
             '#0ea5e9',
-            '#10b981',
+            isDark ? '#84cc16' : '#65a30d',
           ],
           'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.5, 14, 3.2, 17, 4.8],
-          'line-opacity': 0.92,
+          'line-opacity': 0.88,
         },
       });
     }
