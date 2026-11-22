@@ -6,7 +6,7 @@
   "description": "EixoVerde — Navegação inteligente, planejamento seguro em ciclovias e telemetria para mobilidade elétrica e ciclismo no Brasil.",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/assemble-web-dist.mjs --clean && tsc -b && vite build && node scripts/assemble-web-dist.mjs",
     "build:mobile": "tsc -b && vite build --mode mobile",
     "cap:sync": "npm run build:mobile && npx cap sync",
     "cap:android": "npx cap open android",

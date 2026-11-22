@@ -9,10 +9,22 @@ const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 
 };
 
 export default defineConfig(({ command, mode }) => {
-  // Deploy cleanly on GitHub Pages (/EixoVerde/), mobile Capacitor (./), and local dev (/)
-  const base =
-    process.env.VITE_BASE_PATH ??
-    (mode === 'mobile' ? './' : command === 'build' ? '/EixoVerde/' : '/');
+  // Resolve deployment base path across:
+  // - Local dev server (`npm run dev`): `/`
+  // - Capacitor native mobile (`npm run build:mobile`): `./` -> `dist/`
+  // - Web production (`npm run build`): `/app/` -> `dist/app/` (Cloudflare Pages `eixoverde.com/app/`)
+  //   or `<VITE_BASE_PATH>app/` when hosted under a subpath (e.g. GitHub Pages `/EixoVerde/app/`)
+  const isMobileBuild = mode === 'mobile';
+  const isWebProdBuild = command === 'build' && !isMobileBuild;
+
+  let base = '/';
+  if (isMobileBuild) {
+    base = './';
+  } else if (isWebProdBuild) {
+    const rawBase = (process.env.VITE_SITE_BASE ?? process.env.VITE_BASE_PATH ?? '/').trim();
+    const normalizedRoot = rawBase.startsWith('/') ? rawBase.replace(/\/?$/, '/') : `/${rawBase.replace(/\/?$/, '/')}`;
+    base = normalizedRoot.endsWith('/app/') ? normalizedRoot : `${normalizedRoot}app/`;
+  }
 
   return {
     base,
@@ -89,6 +101,13 @@ export default defineConfig(({ command, mode }) => {
             '**/icons/splash-1280.png',
             '**/icons/feature-graphic-1024x500.png',
             '**/data/cities/*.geojson',
+            '**/app-ads.txt',
+            '**/_headers',
+            '**/_redirects',
+            '**/robots.txt',
+            '**/sitemap.xml',
+            '**/privacidade.html',
+            '**/exclusao-conta.html',
           ],
           runtimeCaching: [
             {
@@ -112,6 +131,8 @@ export default defineConfig(({ command, mode }) => {
       }),
     ],
     build: {
+      outDir: isWebProdBuild ? 'dist/app' : 'dist',
+      emptyOutDir: true,
       sourcemap: false,
       rollupOptions: {
         output: {

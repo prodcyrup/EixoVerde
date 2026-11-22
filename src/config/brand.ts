@@ -4,6 +4,12 @@ export const BRAND = {
   name: 'EixoVerde',
   tagline: 'Mobilidade segura em ciclovias',
   regionLabel: 'Brasília DF • Expansão Brasil',
+  websiteUrl: 'https://eixoverde.com',
+  webAppUrl: 'https://eixoverde.com/app/',
+  playStoreUrl: 'https://play.google.com/store/apps/details?id=br.com.eixoverde.app',
+  privacyUrl: 'https://eixoverde.com/privacidade.html',
+  accountDeletionUrl: 'https://eixoverde.com/exclusao-conta.html',
+  contactEmail: 'contato@eixoverde.com',
   defaultCenter: [-47.8825, -15.7912] as LngLat,
   defaultZoom: 13.2,
   // Brasília DF Magnetic Declination (WMM 2026: 22.3° West = -22.3°)

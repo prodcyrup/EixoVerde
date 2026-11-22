@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>EixoVerde — Navegação em Ciclovias e Micromobilidade no Brasil</title>
+    <meta
+      name="description"
+      content="Planeje rotas seguras nas ciclovias das 27 capitais do Brasil com navegação 3D por voz em português, cálculo real de bateria com vento e modo offline-first para patinetes elétricos, e-bikes, bicicletas e e-skates."
+    />
+    <meta name="theme-color" content="#064e3b" />
+    <link rel="canonical" href="https://eixoverde.com/" />
+    <link rel="icon" type="image/svg+xml" href="./icons/eixoverde-icon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png" />
+
+    <!-- Open Graph & Social Sharing -->
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:site_name" content="EixoVerde" />
+    <meta property="og:url" content="https://eixoverde.com/" />
+    <meta property="og:title" content="EixoVerde — Navegação em Ciclovias e Micromobilidade no Brasil" />
+    <meta
+      property="og:description"
+      content="27 capitais brasileiras, 4.771 km de ciclovias CicloMapa em verde-limão, navegação 3D com voz PT-BR e autonomia real de bateria para patinetes elétricos, e-bikes e bicicletas."
+    />
+    <meta property="og:image" content="https://eixoverde.com/icons/feature-graphic-1024x500.png" />
+    <meta property="og:image:width" content="1024" />
+    <meta property="og:image:height" content="500" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="EixoVerde — Navegação em Ciclovias e Micromobilidade no Brasil" />
+    <meta
+      name="twitter:description"
+      content="Rotas seguras em ciclovias nas 27 capitais, navegação 3D com voz PT-BR, garagem elétrica e modo offline-first."
+    />
+    <meta name="twitter:image" content="https://eixoverde.com/icons/feature-graphic-1024x500.png" />
+
+    <!-- Fonts matching the EixoVerde App -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./site/landing.css" />
+
+    <!-- Synchronous theme boot (zero FOUC) + deep-link forwarding (?share=, ?city=, OAuth callback) -->
+    <script>
+      (function () {
+        try {
+          var search = window.location.search || '';
+          var hash = window.location.hash || '';
+          var params = new URLSearchParams(search);
+          if (
+            params.has('share') ||
+            params.has('city') ||
+            params.has('code') ||
+            hash.indexOf('access_token=') !== -1 ||
+            hash.indexOf('type=recovery') !== -1
+          ) {
+            window.location.replace('./app/' + search + hash);
+            return;
+          }
+          var saved = localStorage.getItem('eixoverde:theme');
+          if (
+            saved === 'dark' ||
+            (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          ) {
+            document.documentElement.classList.add('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
+
+    <!-- Structured Data (SoftwareApplication) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "EixoVerde",
+        "applicationCategory": "NavigationApplication",
+        "operatingSystem": "Android, Web PWA",
+        "inLanguage": "pt-BR",
+        "url": "https://eixoverde.com/",
+        "downloadUrl": "https://play.google.com/store/apps/details?id=br.com.eixoverde.app",
+        "description": "Navegação GPS em ciclovias, planejamento seguro e telemetria real de bateria para patinetes elétricos, e-bikes, bicicletas e e-skates nas 27 capitais do Brasil.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "BRL"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <!-- Top Navigation -->
+    <header class="ev-header" id="ev-header">
+      <div class="ev-container ev-header-inner">
+        <a href="./" class="ev-brand" id="ev-brand-link" aria-label="EixoVerde — Página inicial">
+          <img
+            src="./icons/eixoverde-icon.svg"
+            alt=""
+            width="34"
+            height="34"
+            class="ev-brand-icon"
+          />
+          <span class="ev-brand-name">EixoVerde</span>
+        </a>
+
+        <nav class="ev-nav-links" aria-label="Navegação principal">
+          <a href="#recursos">Recursos</a>
+          <a href="#capitais">27 Capitais</a>
+          <a href="#vip">VIP</a>
+          <a href="./privacidade.html">Privacidade</a>
+        </nav>
+
+        <div class="ev-header-actions">
+          <button
+            type="button"
+            id="ev-theme-toggle"
+            class="ev-theme-btn"
+            aria-label="Alternar tema claro ou escuro"
+            aria-pressed="false"
+          >
+            <!-- Moon (visible in light mode) -->
+            <svg class="ev-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+            </svg>
+            <!-- Sun (visible in dark mode) -->
+            <svg class="ev-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+            </svg>
+          </button>
+          <a href="./app/" id="ev-nav-open-app" class="ev-nav-cta">
+            Abrir Web App
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <!-- Hero Section -->
+      <section class="ev-hero" id="hero">
+        <div class="ev-container ev-hero-grid">
+          <div class="ev-hero-copy">
+            <p class="ev-eyebrow">Navegação cicloviária • 27 capitais do Brasil</p>
+            <h1 class="ev-hero-title">Vá mais longe pelas ciclovias do Brasil.</h1>
+            <p class="ev-hero-lead">
+              O navegador feito para <strong>patinetes elétricos, e-bikes, bicicletas e e-skates</strong>.
+              Visualize a malha CicloMapa em verde-limão, receba orientação 3D por voz em português e
+              acompanhe sua autonomia real de bateria — direto no navegador ou no Android.
+            </p>
+
+            <div class="ev-cta-group" role="group" aria-label="Escolher versão do EixoVerde">
+              <a href="./app/" id="ev-cta-web" class="ev-btn ev-btn-primary">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polygon points="3 11 22 2 13 21 11 13 3 11" />
+                </svg>
+                <span>Usar Versão Web</span>
+              </a>
+
+              <a
+                href="https://play.google.com/store/apps/details?id=br.com.eixoverde.app"
+                id="ev-cta-play"
+                class="ev-btn ev-btn-play"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="#059669" d="M3.6 2.4c-.4.4-.6 1-.6 1.8v15.6c0 .8.2 1.4.6 1.8l.1.1 8.8-8.8v-.2L3.7 2.3l-.1.1z" />
+                  <path fill="#84cc16" d="M15.4 15.8l-2.9-2.9v-.2l2.9-2.9.1.1 3.5 2c1 .6 1 1.5 0 2.1l-3.5 2-.1-.2z" />
+                  <path fill="#f59e0b" d="M15.5 15.7L12.5 12.7 3.6 21.6c.4.4 1.1.5 2 .1l9.9-6z" />
+                  <path fill="#0ea5e9" d="M15.5 8.3l-9.9-6c-.9-.4-1.6-.3-2 .1l8.9 8.9 3-3z" />
+                </svg>
+                <span class="ev-btn-play-stack">
+                  <span class="ev-btn-play-sub">Android App</span>
+                  <span class="ev-btn-play-main">Baixar no Google Play</span>
+                </span>
+              </a>
+            </div>
+
+            <p class="ev-hero-note">
+              Funciona sem cadastro obrigatório • Modo offline por capital • Instalável como PWA no Android e iOS
+            </p>
+
+            <div class="ev-hero-metrics" aria-label="Números da rede EixoVerde">
+              <div>
+                <span class="ev-metric-value">27</span>
+                <span class="ev-metric-label">Capitais nas 5 regiões</span>
+              </div>
+              <div>
+                <span class="ev-metric-value">4.771 km</span>
+                <span class="ev-metric-label">Malha CicloMapa</span>
+              </div>
+              <div>
+                <span class="ev-metric-value">86</span>
+                <span class="ev-metric-label">Rotas 3D curadas</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Interactive Product Showcase -->
+          <div class="ev-stage-wrap" id="ev-hero-stage">
+            <div class="ev-phone" aria-label="Prévia interativa do aplicativo EixoVerde">
+              <div class="ev-phone-screen">
+                <div class="ev-phone-statusbar" aria-hidden="true">
+                  <span>08:42</span>
+                  <span class="ev-phone-notch"></span>
+                  <span>5G • 78%</span>
+                </div>
+
+                <!-- Panel 1: Mapa CicloMapa -->
+                <div class="ev-stage-panel is-active" data-stage-panel="map" id="ev-stage-map" aria-hidden="false">
+                  <svg class="ev-map-svg" viewBox="0 0 320 540" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                    <rect width="320" height="540" fill="var(--map-canvas)" />
+                    <!-- Urban green park & lake shapes -->
+                    <path d="M-10 155 Q75 130 120 185 T168 292 Q100 325 22 308 L-10 270 Z" fill="var(--map-park)" />
+                    <path d="M232 -10 Q278 75 268 178 T330 290 L330 -10 Z" fill="var(--map-water)" />
+                    <path d="M185 350 Q245 340 295 395 L295 480 L178 465 Z" fill="var(--map-park)" />
+                    <!-- Subtle street network -->
+                    <g stroke="var(--map-road)" stroke-width="5" fill="none" stroke-linecap="round">
+                      <path d="M20 75 L300 75" />
+                      <path d="M10 198 L255 198" />
+                      <path d="M18 320 L308 320" />
+                      <path d="M96 10 L96 520" />
+                      <path d="M210 10 L210 520" />
+                    </g>
+                    <!-- Lime-green CicloMapa network -->
+                    <g stroke="var(--map-lane)" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.92">
+                      <path d="M36 460 C62 390 88 350 96 290 C102 242 96 180 112 115" />
+                      <path d="M38 198 C108 198 152 175 210 172 C240 170 262 152 288 122" />
+                      <path d="M135 450 C168 402 190 368 210 318 C228 272 248 228 264 176" />
+                      <path d="M46 318 L286 318" stroke-dasharray="9 6" />
+                    </g>
+                    <!-- Active emerald safe route -->
+                    <path
+                      class="ev-route-draw"
+                      d="M84 322 C92 292 96 266 104 238 C116 206 144 192 178 184 C202 178 218 166 238 148"
+                      fill="none"
+                      stroke="var(--map-route)"
+                      stroke-width="7"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <!-- Origin & destination pins -->
+                    <circle cx="84" cy="322" r="8" fill="#ffffff" stroke="var(--map-route)" stroke-width="4" />
+                    <circle cx="238" cy="148" r="9" fill="var(--map-route)" stroke="#ffffff" stroke-width="3" />
+                  </svg>
+
+                  <div class="ev-phone-top">
+                    <div class="ev-phone-search">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--emerald-ink)" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+                        <circle cx="11" cy="11" r="7" />
+                        <path d="m20 20-3.5-3.5" />
+                      </svg>
+                      <span class="ev-phone-search-text">Parque da Cidade → Eixo Monumental</span>
+                    </div>
+                    <div class="ev-phone-chip-row">
+                      <span class="ev-phone-chip">
+                        <span class="ev-lane-swatch"></span>
+                        Ciclovias CicloMapa
+                      </span>
+                      <span class="ev-phone-chip font-mono">24°C • 9 km/h</span>
+                    </div>
+                  </div>
+
+                  <div class="ev-phone-bottom">
+                    <div class="ev-phone-sheet">
+                      <div class="ev-sheet-row">
+                        <div>
+                          <div class="ev-sheet-title">Rota Mais Segura</div>
+                          <div class="ev-sheet-sub">Priorizando ciclovias protegidas</div>
+                        </div>
+                        <span class="ev-safety-tag">94% ciclovia</span>
+                      </div>
+                      <div class="ev-seg-bar" aria-hidden="true">
+                        <span class="ev-seg-lane"></span>
+                        <span class="ev-seg-calm"></span>
+                        <span class="ev-seg-road"></span>
+                      </div>
+                      <div class="ev-sheet-stats">
+                        <div>
+                          <span class="ev-sheet-stat-val">8,4 km</span>
+                          <span class="ev-sheet-stat-lbl">Distância</span>
+                        </div>
+                        <div>
+                          <span class="ev-sheet-stat-val">23 min</span>
+                          <span class="ev-sheet-stat-lbl">ETA real</span>
+                        </div>
+                        <div>
+                          <span class="ev-sheet-stat-val">-14%</span>
+                          <span class="ev-sheet-stat-lbl">Bateria est.</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Panel 2: Navegação 3D + Voz -->
+                <div class="ev-stage-panel" data-stage-panel="nav" id="ev-stage-nav" aria-hidden="true">
+                  <svg class="ev-map-svg" viewBox="0 0 320 540" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                    <rect width="320" height="540" fill="var(--map-canvas)" />
+                    <!-- 3D perspective road & lane corridor -->
+                    <polygon points="118,175 202,175 304,540 16,540" fill="var(--map-road)" />
+                    <polygon points="146,175 174,175 214,540 106,540" fill="var(--map-route)" opacity="0.22" />
+                    <path d="M160 540 L160 225" stroke="var(--map-route)" stroke-width="10" stroke-linecap="round" />
+                    <path d="M160 225 L235 190" stroke="var(--map-lane)" stroke-width="8" stroke-linecap="round" />
+                    <!-- Navigation directional puck -->
+                    <polygon points="160,342 184,398 160,384 136,398" fill="var(--map-route)" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" />
+                  </svg>
+
+                  <div class="ev-phone-top">
+                    <div class="ev-nav-banner">
+                      <div class="ev-nav-banner-dist">180 m</div>
+                      <div class="ev-nav-banner-instr">Vire à direita na Ciclovia W4 Sul</div>
+                    </div>
+                    <div class="ev-nav-alert">
+                      Atenção: travessia de via arterial em 220 m
+                    </div>
+                  </div>
+
+                  <div class="ev-phone-bottom">
+                    <div class="ev-nav-hud">
+                      <div class="ev-hud-box">
+                        <div class="ev-hud-num">24 km/h</div>
+                        <div class="ev-hud-sub">Voz PT-BR ativa • Modo 3D</div>
+                      </div>
+                      <div class="ev-hud-box">
+                        <div class="ev-hud-num">78%</div>
+                        <div class="ev-hud-sub">+31 km restantes</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Panel 3: Garagem & Telemetria Elétrica -->
+                <div class="ev-stage-panel" data-stage-panel="garage" id="ev-stage-garage" aria-hidden="true">
+                  <div class="ev-garage-bg" aria-hidden="true"></div>
+                  <div class="ev-phone-top ev-garage-head">
+                    <div class="ev-garage-kicker">Minha Garagem • Calibrado</div>
+                    <div class="ev-garage-model">Patinete Elétrico 551 Wh</div>
+                    <div class="ev-mode-pills">
+                      <span class="ev-mode-pill is-selected">Patinete</span>
+                      <span class="ev-mode-pill">E-Bike</span>
+                      <span class="ev-mode-pill">Bicicleta</span>
+                      <span class="ev-mode-pill">E-Skate</span>
+                    </div>
+
+                    <div class="ev-battery-meter">
+                      <div class="ev-sheet-row">
+                        <span class="ev-sheet-title">Autonomia real agora</span>
+                        <span class="ev-safety-tag">78% carga</span>
+                      </div>
+                      <div class="ev-battery-bar-track">
+                        <div class="ev-battery-bar-fill"></div>
+                      </div>
+                      <div class="ev-sheet-sub" style="margin-top: 8px;">
+                        Ajustada para vento frontal de 9 km/h e desnível +140 m
+                      </div>
+                    </div>
+
+                    <div class="ev-garage-grid">
+                      <div class="ev-garage-tile">
+                        <span class="ev-sheet-stat-val">46,2 km</span>
+                        <span class="ev-sheet-stat-lbl">Alcance estimado</span>
+                      </div>
+                      <div class="ev-garage-tile">
+                        <span class="ev-sheet-stat-val">11,9 Wh/km</span>
+                        <span class="ev-sheet-stat-lbl">Consumo real</span>
+                      </div>
+                      <div class="ev-garage-tile">
+                        <span class="ev-sheet-stat-val">20 modelos</span>
+                        <span class="ev-sheet-stat-lbl">Catálogo BR</span>
+                      </div>
+                      <div class="ev-garage-tile">
+                        <span class="ev-sheet-stat-val">GPX 1.1</span>
+                        <span class="ev-sheet-stat-lbl">Replay &amp; exportação</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="ev-phone-bottom">
+                    <div class="ev-phone-sheet">
+                      <div class="ev-sheet-title">Calibração contínua</div>
+                      <div class="ev-sheet-sub">
+                        Cada trajeto registrado refina automaticamente o gasto de bateria do seu veículo.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Interactive Screen Switcher -->
+            <div class="ev-stage-tabs" role="tablist" aria-label="Telas do aplicativo EixoVerde">
+              <button
+                type="button"
+                role="tab"
+                id="ev-tab-map"
+                class="ev-stage-tab"
+                data-stage-tab="map"
+                aria-selected="true"
+                aria-controls="ev-stage-map"
+              >
+                Ciclovias
+              </button>
+              <button
+                type="button"
+                role="tab"
+                id="ev-tab-nav"
+                class="ev-stage-tab"
+                data-stage-tab="nav"
+                aria-selected="false"
+                aria-controls="ev-stage-nav"
+                tabindex="-1"
+              >
+                Navegação 3D
+              </button>
+              <button
+                type="button"
+                role="tab"
+                id="ev-tab-garage"
+                class="ev-stage-tab"
+                data-stage-tab="garage"
+                aria-selected="false"
+                aria-controls="ev-stage-garage"
+                tabindex="-1"
+              >
+                Garagem
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Core Features Showcase -->
+      <section class="ev-section" id="recursos">
+        <div class="ev-container">
+          <div class="ev-section-head">
+            <p class="ev-section-kicker">Feito para o dia a dia no guidão</p>
+            <h2 class="ev-section-title">Segurança cicloviária, telemetria real e cobertura nacional em um só mapa.</h2>
+            <p class="ev-section-lead">
+              Cada recurso foi desenhado para quem circula de patinete elétrico, e-bike, bicicleta ou e-skate
+              pelas cidades brasileiras — sem exigir conta e sem poluição visual.
+            </p>
+          </div>
+
+          <div class="ev-features-grid">
+            <article class="ev-feature-card">
+              <div class="ev-feature-icon is-lime" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12Z" />
+                  <circle cx="12" cy="10" r="2.5" />
+                </svg>
+              </div>
+              <h3 class="ev-feature-title">27 capitais &amp; malha CicloMapa em verde-limão</h3>
+              <p class="ev-feature-desc">
+                Todas as 27 capitais brasileiras agrupadas nas 5 regiões, com 54 bases otimizadas do CicloMapa,
+                estações de bicicletas e patinetes compartilhados e contraste imediato em verde-limão.
+              </p>
+              <div class="ev-feature-meta">4.771 km mapeados • 6.014 pontos de apoio</div>
+            </article>
+
+            <article class="ev-feature-card">
+              <div class="ev-feature-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="3 11 22 2 13 21 11 13 3 11" />
+                </svg>
+              </div>
+              <h3 class="ev-feature-title">Navegação 3D de guidão + Voz PT-BR &amp; Modo Livre</h3>
+              <p class="ev-feature-desc">
+                Mapa vetorial 3D orientado pela bússola, comandos de voz em português, alertas de travessia de
+                vias arteriais, Modo Livre multimodal, gravação com auto-pausa em semáforos e exportação GPX 1.1.
+              </p>
+              <div class="ev-feature-meta">Replay de velocidade e altitude em Meus Trajetos</div>
+            </article>
+
+            <article class="ev-feature-card">
+              <div class="ev-feature-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="7" width="16" height="10" rx="2" />
+                  <path d="M22 11v2" />
+                  <path d="M10 10l-2 2h4l-2 2" />
+                </svg>
+              </div>
+              <h3 class="ev-feature-title">Garagem Elétrica &amp; autonomia real com clima</h3>
+              <p class="ev-feature-desc">
+                Compare 20 modelos no catálogo brasileiro ou cadastre seu próprio veículo. O EixoVerde combina
+                elevação, vento ao vivo (Open-Meteo), peso e calibração real de Wh/km para prever sua carga na chegada.
+              </p>
+              <div class="ev-feature-meta">Patinete • E-Bike • Bicicleta • E-Skate</div>
+            </article>
+
+            <article class="ev-feature-card">
+              <div class="ev-feature-icon is-lime" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 19L10 5l4 8 3-4 3 10" />
+                </svg>
+              </div>
+              <h3 class="ev-feature-title">Roteamento seguro multi-perfil com fallback offline</h3>
+              <p class="ev-feature-desc">
+                Compare trajetos <em>Mais Segura</em>, <em>Equilibrada</em> e <em>Mais Rápida</em> com barra
+                visual de segurança trecho a trecho (ciclovia, ciclofaixa, via calma) e resiliência offline caso o sinal caia.
+              </p>
+              <div class="ev-feature-meta">86 rotas 3D curadas prontas para explorar</div>
+            </article>
+
+            <article class="ev-feature-card">
+              <div class="ev-feature-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
+              </div>
+              <h3 class="ev-feature-title">Avaliações adaptativas 1–5★ &amp; alertas na via</h3>
+              <p class="ev-feature-desc">
+                Avalie rotas com tags que se adaptam à nota escolhida (de elogios em 5★ a alertas de asfalto ou
+                iluminação em 1–2★) e reporte buracos, obras ou obstáculos em tempo real para a comunidade.
+              </p>
+              <div class="ev-feature-meta">Sinalização colaborativa em tempo real</div>
+            </article>
+
+            <article class="ev-feature-card">
+              <div class="ev-feature-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
+                  <path d="m9 12 2 2 4-4" />
+                </svg>
+              </div>
+              <h3 class="ev-feature-title">Offline-First &amp; privacidade LGPD de verdade</h3>
+              <p class="ev-feature-desc">
+                Use todos os recursos essenciais no modo Visitante sem criar conta, salve a malha da sua capital
+                para uso offline e sincronize na nuvem apenas se quiser — com exclusão instantânea de conta no app.
+              </p>
+              <div class="ev-feature-meta">Zero venda de dados • LGPD (Lei 13.709/2018)</div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- National Coverage Explorer -->
+      <section class="ev-section" id="capitais">
+        <div class="ev-container">
+          <div class="ev-section-head">
+            <p class="ev-section-kicker">Cobertura nacional</p>
+            <h2 class="ev-section-title">Todas as 27 capitais brasileiras, prontas em 1 toque.</h2>
+            <p class="ev-section-lead">
+              Escolha sua região e toque em qualquer capital para abrir o mapa cicloviário diretamente na versão Web.
+            </p>
+          </div>
+
+          <div class="ev-region-tabs" role="group" aria-label="Filtrar capitais por região">
+            <button type="button" class="ev-region-btn" data-region-filter="Destaques" aria-pressed="true">Destaques</button>
+            <button type="button" class="ev-region-btn" data-region-filter="Centro-Oeste" aria-pressed="false">Centro-Oeste (4)</button>
+            <button type="button" class="ev-region-btn" data-region-filter="Sudeste" aria-pressed="false">Sudeste (4)</button>
+            <button type="button" class="ev-region-btn" data-region-filter="Sul" aria-pressed="false">Sul (3)</button>
+            <button type="button" class="ev-region-btn" data-region-filter="Nordeste" aria-pressed="false">Nordeste (9)</button>
+            <button type="button" class="ev-region-btn" data-region-filter="Norte" aria-pressed="false">Norte (7)</button>
+          </div>
+
+          <div class="ev-capitals-grid" id="ev-capitals-grid" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <!-- Free vs EixoVerde VIP Section -->
+      <section class="ev-section" id="vip">
+        <div class="ev-container">
+          <div class="ev-section-head">
+            <p class="ev-section-kicker">Modelo transparente</p>
+            <h2 class="ev-section-title">Gratuito para navegar. VIP vitalício sem mensalidade.</h2>
+            <p class="ev-section-lead">
+              A navegação segura nunca fica atrás de paywall — e nenhum anúncio jamais aparece enquanto você está pilotando.
+            </p>
+          </div>
+
+          <div class="ev-pricing-grid">
+            <article class="ev-plan-card">
+              <span class="ev-plan-tag">Plano Gratuito</span>
+              <h3 class="ev-plan-name">EixoVerde Essencial</h3>
+              <div class="ev-plan-price-row">
+                <span class="ev-plan-price">R$ 0</span>
+                <span class="ev-plan-period">para sempre</span>
+              </div>
+              <p class="ev-plan-summary">
+                Tudo o que você precisa para planejar e navegar com segurança nas ciclovias do Brasil.
+              </p>
+              <ul class="ev-plan-list">
+                <li>
+                  <svg class="ev-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5" /></svg>
+                  <span>Navegação 3D de guidão, voz PT-BR e Modo Livre sem limites</span>
+                </li>
+                <li>
+                  <svg class="ev-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5" /></svg>
+                  <span>Malha CicloMapa e rotas 3D curadas nas 27 capitais</span>
+                </li>
+                <li>
+                  <svg class="ev-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5" /></svg>
+                  <span>1 capital em cache offline + 1 veículo personalizado + 3 exportações GPX</span>
+                </li>
+                <li>
+                  <svg class="ev-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5" /></svg>
+                  <span>Zero anúncios durante navegação ativa ou Modo Livre</span>
+                </li>
+              </ul>
+              <div class="ev-plan-foot">
+                Banner discreto apenas nas telas de busca e planejamento.
+              </div>
+            </article>
+
+            <article class="ev-plan-card is-vip">
+              <span class="ev-plan-tag">Pagamento Único • Vitalício</span>
+              <h3 class="ev-plan-name">EixoVerde VIP</h3>
+              <div class="ev-plan-price-row">
+                <span class="ev-plan-price">R$ 9,90</span>
+                <span class="ev-plan-period">pague 1 vez, seu para sempre</span>
+              </div>
+              <p class="ev-plan-summary">
+                Apoie o desenvolvimento independente e libere todos os limites sem assinatura recorrente.
+              </p>
+              <ul class="ev-plan-list">
+                <li>
+                  <svg class="ev-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5" /></svg>
+                  <span><strong>Zero anúncios para sempre</strong> em todas as telas do app</span>
+                </li>
+                <li>
+                  <svg class="ev-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5" /></svg>
+                  <span><strong>Cache offline ilimitado</strong> para baixar quantas capitais quiser</span>
+                </li>
+                <li>
+                  <svg class="ev-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5" /></svg>
+                  <span><strong>Garagem personalizada ilimitada</strong> e exportação GPX 1.1 ilimitada</span>
+                </li>
+                <li>
+                  <svg class="ev-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m20 6-11 11-5-5" /></svg>
+                  <span>Selo dourado VIP sincronizado na sua conta EixoVerde Cloud</span>
+                </li>
+              </ul>
+              <div class="ev-plan-foot">
+                Disponível dentro do aplicativo via Google Play (<code>eixoverde_vip_lifetime</code>).
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- Final CTA & PWA Tip -->
+      <section class="ev-section" id="comecar">
+        <div class="ev-container">
+          <div class="ev-final-cta">
+            <div class="ev-final-grid">
+              <div>
+                <p class="ev-section-kicker">Comece agora</p>
+                <h2 class="ev-section-title" style="margin-bottom: 10px;">Abra o mapa agora mesmo ou instale no seu celular.</h2>
+                <p class="ev-section-lead" style="margin-bottom: 24px;">
+                  Sem burocracia: experimente a versão Web completa em segundos ou baixe o app oficial no Google Play.
+                </p>
+                <div class="ev-cta-group">
+                  <a href="./app/" id="ev-footer-cta-web" class="ev-btn ev-btn-primary">Usar Versão Web</a>
+                  <a
+                    href="https://play.google.com/store/apps/details?id=br.com.eixoverde.app"
+                    id="ev-footer-cta-play"
+                    class="ev-btn ev-btn-play"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Baixar no Google Play
+                  </a>
+                </div>
+              </div>
+
+              <div class="ev-pwa-tips">
+                <p><strong>Usar como app no navegador (PWA):</strong></p>
+                <p>
+                  <strong>Android (Chrome):</strong> abra a Versão Web, toque em <strong>⋮</strong> e selecione
+                  <em>Instalar aplicativo</em>.
+                </p>
+                <p>
+                  <strong>iPhone / iPad (Safari):</strong> abra a Versão Web, toque em <strong>Compartilhar</strong> e
+                  escolha <em>Adicionar à Tela de Início</em>.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Official Footer -->
+    <footer class="ev-footer" id="ev-footer">
+      <div class="ev-container">
+        <div class="ev-footer-top">
+          <div>
+            <a href="./" class="ev-brand">
+              <img src="./icons/eixoverde-icon.svg" alt="" width="30" height="30" class="ev-brand-icon" />
+              <span class="ev-brand-name">EixoVerde</span>
+            </a>
+            <p class="ev-footer-desc">
+              Navegação segura em ciclovias e telemetria inteligente para micromobilidade elétrica e ciclismo no Brasil
+              (<code class="font-mono">br.com.eixoverde.app</code>).
+            </p>
+          </div>
+
+          <div>
+            <h2 class="ev-footer-col-title">Aplicativo</h2>
+            <ul class="ev-footer-links">
+              <li><a href="./app/">Versão Web (PWA)</a></li>
+              <li>
+                <a
+                  href="https://play.google.com/store/apps/details?id=br.com.eixoverde.app"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Google Play (Android)
+                </a>
+              </li>
+              <li><a href="#recursos">Recursos</a></li>
+              <li><a href="#capitais">27 Capitais</a></li>
+              <li><a href="#vip">EixoVerde VIP (R$ 9,90)</a></li>
+            </ul>
+          </div>
+
+          <div>
+            <h2 class="ev-footer-col-title">Legal &amp; Contato</h2>
+            <ul class="ev-footer-links">
+              <li><a href="./privacidade.html" id="ev-link-privacy">Política de Privacidade (LGPD)</a></li>
+              <li><a href="./exclusao-conta.html" id="ev-link-deletion">Exclusão de Conta e Dados</a></li>
+              <li><a href="./app-ads.txt" id="ev-link-app-ads">app-ads.txt (Google AdMob)</a></li>
+              <li><a href="mailto:contato@eixoverde.com" id="ev-link-email">contato@eixoverde.com</a></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="ev-footer-bottom">
+          <span>© 2026 EixoVerde • eixoverde.com</span>
+          <span>Conformidade LGPD (Lei nº 13.709/2018) • Dados cicloviários: CicloMapa / OpenStreetMap</span>
+        </div>
+      </div>
+    </footer>
+
+    <script src="./site/landing.js" defer></script>
+  </body>
+</html>

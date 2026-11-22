@@ -4,28 +4,36 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Exclusão de Conta e Dados — EixoVerde</title>
+    <meta name="description" content="Instruções para exclusão imediata de conta e dados na nuvem do EixoVerde em conformidade com a LGPD e Google Play Data Safety." />
+    <link rel="canonical" href="https://eixoverde.com/exclusao-conta.html" />
     <link rel="icon" type="image/svg+xml" href="./icons/eixoverde-icon.svg" />
+    <script>
+      try {
+        var t = localStorage.getItem('eixoverde:theme');
+        if (t === 'dark' || (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark');
+        }
+      } catch (e) {}
+    </script>
     <style>
       :root {
         color-scheme: light dark;
-        --bg: #f8fafc;
+        --bg: #f6f8f7;
         --card: #ffffff;
-        --text: #0f172a;
-        --muted: #475569;
-        --border: #e2e8f0;
+        --text: #0b1c15;
+        --muted: #475b52;
+        --border: #dde5e0;
         --accent: #059669;
         --danger: #e11d48;
       }
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --bg: #0b1116;
-          --card: #0f172a;
-          --text: #f8fafc;
-          --muted: #94a3b8;
-          --border: #1e293b;
-          --accent: #34d399;
-          --danger: #fb7185;
-        }
+      html.dark {
+        --bg: #090f12;
+        --card: #10181d;
+        --text: #f1f5f4;
+        --muted: #94a3a0;
+        --border: #1e2d29;
+        --accent: #34d399;
+        --danger: #fb7185;
       }
       * { box-sizing: border-box; }
       body {
@@ -113,7 +121,7 @@
         <span class="badge">Exclusão Imediata no Aplicativo</span>
         <h2>Como excluir sua conta instantaneamente</h2>
         <ol>
-          <li>Abra o aplicativo <strong>EixoVerde</strong> (Android, iOS ou <a href="./">Web App</a>) conectado à sua conta.</li>
+          <li>Abra o aplicativo <strong>EixoVerde</strong> (Android, iOS ou <a href="./app/">Web App</a>) conectado à sua conta.</li>
           <li>Toque no ícone de <strong>Menu lateral (☰)</strong> no canto superior esquerdo.</li>
           <li>No cartão da sua conta, toque em <strong>Excluir minha conta e dados na nuvem</strong>.</li>
           <li>(Opcional) Marque <em>&ldquo;Apagar também dados salvos neste aparelho&rdquo;</em> caso queira limpar o cache local.</li>
@@ -133,13 +141,13 @@
         <h2>Não tem mais acesso ao aplicativo?</h2>
         <p>
           Você também pode solicitar a exclusão manual enviando um e-mail a partir do endereço cadastrado para
-          <a href="mailto:prodcyrup@gmail.com?subject=Solicita%C3%A7%C3%A3o%20de%20Exclus%C3%A3o%20de%20Conta%20-%20EixoVerde">prodcyrup@gmail.com</a>
+          <a href="mailto:contato@eixoverde.com?subject=Solicita%C3%A7%C3%A3o%20de%20Exclus%C3%A3o%20de%20Conta%20-%20EixoVerde">contato@eixoverde.com</a>
           com o assunto <strong>&ldquo;Exclusão de Conta — EixoVerde&rdquo;</strong>. Processaremos sua solicitação em até 48 horas úteis.
         </p>
       </section>
 
       <footer>
-        <a href="./privacidade.html">Política de Privacidade (LGPD)</a> • <a href="./">Voltar ao EixoVerde</a>
+        <a href="./privacidade.html">Política de Privacidade (LGPD)</a> • <a href="./">Site Oficial</a> • <a href="./app/">Abrir Web App</a>
       </footer>
     </main>
   </body>
