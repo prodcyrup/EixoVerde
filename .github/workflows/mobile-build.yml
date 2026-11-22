@@ -49,6 +49,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
           VITE_MAPTILER_KEY: ${{ vars.VITE_MAPTILER_KEY }}
+          VITE_ADMOB_ANDROID_BANNER_ID: ${{ secrets.VITE_ADMOB_ANDROID_BANNER_ID }}
         run: |
           npm run build:mobile
           npx cap sync android

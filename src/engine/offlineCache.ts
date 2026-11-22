@@ -103,6 +103,13 @@ export async function warmOfflineDfCache(
         if (cap.slug === 'brasilia') {
           localStorage.setItem(CACHE_META_KEY_PREFIX, nowIso);
         }
+        const existing = getCachedOfflineCitySlugs();
+        if (!existing.includes(cap.slug)) {
+          localStorage.setItem(
+            `${CACHE_META_KEY_PREFIX}:cities`,
+            JSON.stringify([...existing, cap.slug])
+          );
+        }
       }
     } catch {
       // Ignore
@@ -112,4 +119,21 @@ export async function warmOfflineDfCache(
   }
 
   return checkOfflineDfCacheStatus(baseUrl, cap.slug);
+}
+
+export function getCachedOfflineCitySlugs(): string[] {
+  try {
+    if (typeof localStorage === 'undefined') return [];
+    const raw = localStorage.getItem(`${CACHE_META_KEY_PREFIX}:cities`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.filter((x): x is string => typeof x === 'string');
+    }
+    if (localStorage.getItem(CACHE_META_KEY_PREFIX)) {
+      return ['brasilia'];
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return [];
 }

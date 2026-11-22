@@ -277,9 +277,15 @@ export type RouteSafetyTag =
   | 'bom_asfalto'
   | 'iluminada'
   | 'sombra'
+  | 'paisagem'
+  | 'bem_sinalizada'
+  | 'ciclovia_larga'
   | 'cruzamento_tenso'
   | 'muito_movimento'
-  | 'paisagem';
+  | 'asfalto_irregular'
+  | 'mal_iluminada'
+  | 'insegura'
+  | 'trecho_obstruido';
 
 export interface RouteRatingRecord {
   routeId: string;
@@ -338,6 +344,9 @@ export interface UserPreferences {
   showHazards: boolean;
   showSafetySegments?: boolean;
   selectedCitySlug?: string;
+  isPremium?: boolean;
+  premiumSince?: string;
+  gpxExportCount?: number;
   homePlace?: PlaceResult;
   workPlace?: PlaceResult;
   batteryCalibrations?: Record<string, VehicleBatteryCalibration>;

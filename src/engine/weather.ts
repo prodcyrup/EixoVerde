@@ -149,7 +149,7 @@ export function buildWeatherSafetyWarning(
     weather.rainProbabilityPct >= 55;
 
   if (isStorm) {
-    return `Alerta de tempestade (${Math.round(weather.windGustsKmh)} km/h): evite pedalar em áreas abertas e procure abrigo seguro.`;
+    return `Alerta de tempestade (${Math.round(weather.windGustsKmh)} km/h): evite circular em áreas abertas e procure abrigo seguro.`;
   }
 
   if (isWet) {
@@ -168,7 +168,7 @@ export function buildWeatherSafetyWarning(
   }
 
   if (weather.isDay && weather.uvIndex >= 9) {
-    return `Índice UV extremo (${Math.round(weather.uvIndex)}): use protetor solar, óculos e hidrate-se no pedal.`;
+    return `Índice UV extremo (${Math.round(weather.uvIndex)}): use protetor solar, óculos e hidrate-se no trajeto.`;
   }
 
   return null;

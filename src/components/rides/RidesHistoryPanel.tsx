@@ -117,16 +117,18 @@ export function RidesHistoryPanel() {
   const batteryCalibrations = useAppStore((s) => s.batteryCalibrations);
   const resetVehicleCalibration = useAppStore((s) => s.resetVehicleCalibration);
   const activeVehicle = useAppStore(selectActiveVehicle);
+  const consumeGpxExportQuota = useAppStore((s) => s.consumeGpxExportQuota);
   const pushToast = useAppStore((s) => s.pushToast);
 
   const stats = computeLifetimeRideStats(rideSessions);
   const activeCal = batteryCalibrations[activeVehicle.id];
 
   const handleExportRideGpx = (ride: RideSession) => {
+    if (!consumeGpxExportQuota()) return;
     const gpx = exportRideToGpx(ride);
     const slug = ride.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40);
-    downloadTextFile(`eixoverde-pedal-${slug || ride.id}.gpx`, gpx);
-    pushToast('GPX do pedal exportado!', 'Arquivo GPX 1.1 pronto para compartilhamento.', 'emerald');
+    downloadTextFile(`eixoverde-trajeto-${slug || ride.id}.gpx`, gpx);
+    pushToast('GPX do trajeto exportado!', 'Arquivo GPX 1.1 pronto para compartilhamento.', 'emerald');
   };
 
   return (
@@ -139,7 +141,7 @@ export function RidesHistoryPanel() {
         className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-3 text-xs font-extrabold text-white shadow-lg shadow-emerald-600/20 transition-colors hover:bg-emerald-500 active:scale-[0.99]"
       >
         <Play className="h-4 w-4 fill-current" />
-        Gravar Pedal Livre (GPS + Auto-Pausa)
+        Gravar Modo Livre (GPS + Auto-Pausa)
       </button>
 
       {/* Lifetime Telemetry Summary Card */}
@@ -153,7 +155,7 @@ export function RidesHistoryPanel() {
             Resumo Acumulado
           </div>
           <span className="font-mono-num text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
-            {stats.totalRealRides} {stats.totalRealRides === 1 ? 'pedal real' : 'pedais reais'}
+            {stats.totalRealRides} {stats.totalRealRides === 1 ? 'trajeto real' : 'trajetos reais'}
             {stats.totalDemoRides > 0 ? ` • ${stats.totalDemoRides} sim.` : ''}
           </span>
         </div>
@@ -193,7 +195,7 @@ export function RidesHistoryPanel() {
               <span className="truncate font-semibold">
                 {activeVehicle.name.split(' ')[0]}: autonomia calibrada em{' '}
                 <strong className="font-mono-num">{Math.round(activeCal.efficiencyMultiplier * 100)}%</strong> (
-                {activeCal.sampleCount} {activeCal.sampleCount === 1 ? 'pedal' : 'pedais'})
+                {activeCal.sampleCount} {activeCal.sampleCount === 1 ? 'trajeto' : 'trajetos'})
               </span>
             </div>
             <button
@@ -213,7 +215,7 @@ export function RidesHistoryPanel() {
       <div className="space-y-2">
         <div className="flex items-center justify-between px-0.5">
           <h2 className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            Histórico de Pedais ({rideSessions.length})
+            Histórico de Trajetos ({rideSessions.length})
           </h2>
           {replayingRideId && (
             <button
@@ -230,10 +232,10 @@ export function RidesHistoryPanel() {
           <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-6 text-center dark:border-slate-700">
             <Route className="mx-auto h-7 w-7 text-slate-300 dark:text-slate-600" />
             <p className="mt-2 text-xs font-bold text-slate-600 dark:text-slate-300">
-              Nenhum pedal gravado ainda
+              Nenhum trajeto gravado ainda
             </p>
             <p className="mt-0.5 text-[11px] text-slate-400">
-              Toda navegação guiada é gravada automaticamente, ou toque em <strong>Gravar Pedal Livre</strong> acima.
+              Toda navegação guiada é gravada automaticamente, ou toque em <strong>Gravar Modo Livre</strong> acima.
             </p>
           </div>
         ) : (
@@ -271,7 +273,7 @@ export function RidesHistoryPanel() {
                             </span>
                           ) : ride.mode === 'free_ride' ? (
                             <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-extrabold text-sky-700 dark:text-sky-300">
-                              Pedal Livre
+                              Modo Livre
                             </span>
                           ) : (
                             <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300">
@@ -346,8 +348,8 @@ export function RidesHistoryPanel() {
                         <button
                           type="button"
                           onClick={() => void deleteRideSession(ride.id)}
-                          aria-label="Excluir pedal"
-                          title="Excluir pedal"
+                          aria-label="Excluir trajeto"
+                          title="Excluir trajeto"
                           className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white p-2 text-slate-500 hover:border-rose-500/40 hover:text-rose-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
