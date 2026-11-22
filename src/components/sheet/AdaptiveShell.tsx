@@ -421,7 +421,7 @@ export function AdaptiveShell() {
             <div className="glass-panel mb-2 space-y-1.5 rounded-2xl p-3 text-xs shadow-xl">
               <div className="font-bold text-slate-800 dark:text-slate-100">Legenda da Malha</div>
               <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                <span className="h-1.5 w-5 rounded-full bg-emerald-500" /> Ciclovia segregada
+                <span className="h-1.5 w-5 rounded-full bg-lime-600 dark:bg-lime-500" /> Ciclovia segregada
               </div>
               <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                 <span className="h-1.5 w-5 rounded-full bg-sky-500" /> Ciclofaixa
