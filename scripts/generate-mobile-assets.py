@@ -162,6 +162,40 @@ def main() -> None:
                 shutil.copy2(ICONS_DIR / "splash-1280.png", ios_splash)
             print("Populated iOS AppIcon (1024x1024) & Splash.imageset")
 
+        # 1024x500 Google Play Store Feature Graphic
+        page.set_viewport_size({"width": 1024, "height": 500})
+        feature_html = f"""<!DOCTYPE html>
+        <html>
+          <body style="margin:0;width:1024px;height:500px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;padding:0 68px;box-sizing:border-box;background:radial-gradient(circle at 82% 24%, rgba(132,204,22,0.28) 0%, rgba(16,185,129,0.12) 38%, transparent 65%), linear-gradient(135deg,#022c22 0%,#064e3b 52%,#0f172a 100%);font-family:'Plus Jakarta Sans','Inter',sans-serif;color:#ffffff">
+            <svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.22;pointer-events:none" viewBox="0 0 1024 500" fill="none">
+              <path d="M-40 420 C 180 390, 290 220, 520 240 C 750 260, 820 90, 1080 110" stroke="#84cc16" stroke-width="10" stroke-linecap="round"/>
+              <path d="M-20 460 C 210 420, 340 280, 580 300 C 800 320, 880 160, 1080 190" stroke="#10b981" stroke-width="6" stroke-dasharray="14 12" stroke-linecap="round"/>
+              <circle cx="520" cy="240" r="10" fill="#84cc16" />
+              <circle cx="845" cy="135" r="10" fill="#34d399" />
+            </svg>
+            <div style="position:relative;z-index:2;max-width:610px">
+              <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(132,204,22,0.18);border:1px solid rgba(132,204,22,0.45);border-radius:999px;padding:6px 14px;font-size:14px;font-weight:800;letter-spacing:0.04em;color:#bef264;text-transform:uppercase">
+                27 Capitais do Brasil • Offline-First
+              </div>
+              <div style="margin-top:16px;font-size:66px;font-weight:800;letter-spacing:-0.03em;line-height:1.02">EixoVerde</div>
+              <div style="margin-top:12px;font-size:23px;font-weight:600;color:#d1fae5;line-height:1.35">
+                Ciclovias, Rotas Seguras &amp; Mobilidade Elétrica para Patinetes, E-Bikes e Bicicletas
+              </div>
+              <div style="margin-top:22px;display:flex;gap:10px;flex-wrap:wrap;font-size:14px;font-weight:700;color:#ecfdf5">
+                <span style="background:rgba(255,255,255,0.12);padding:7px 14px;border-radius:999px">🗺️ Malha CicloMapa</span>
+                <span style="background:rgba(255,255,255,0.12);padding:7px 14px;border-radius:999px">⚡ Autonomia Real</span>
+                <span style="background:rgba(255,255,255,0.12);padding:7px 14px;border-radius:999px">🧭 Navegação 3D + Voz</span>
+              </div>
+            </div>
+            <div style="position:relative;z-index:2;width:236px;height:236px;border-radius:56px;overflow:hidden;box-shadow:0 28px 70px rgba(0,0,0,0.52);border:3px solid rgba(110,231,183,0.35)">
+              {FULL_BLD_SVG}
+            </div>
+          </body>
+        </html>"""
+        page.set_content(feature_html)
+        page.screenshot(path=str(ICONS_DIR / "feature-graphic-1024x500.png"), omit_background=False)
+        print("Generated public/icons/feature-graphic-1024x500.png (1024x500)")
+
         browser.close()
 
 
