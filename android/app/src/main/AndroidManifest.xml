@@ -9,10 +9,10 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
-        <!-- Google AdMob App ID (Google official test ID; swap to production ca-app-pub-XXXX~YYYY before Play Store release) -->
+        <!-- Google AdMob App ID (production App ID; banner unit safely uses Google test ID until VITE_ADMOB_ANDROID_BANNER_ID is set) -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713" />
+            android:value="ca-app-pub-6690812959868851~6422068887" />
 
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"

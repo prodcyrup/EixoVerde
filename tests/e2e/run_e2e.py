@@ -252,7 +252,10 @@ def run_e2e() -> int:
                 and page.locator("#eixoverde-warm-offline-btn").is_visible(),
             )
             page.click("#eixoverde-warm-offline-btn")
-            time.sleep(0.7)
+            try:
+                page.wait_for_selector("#eixoverde-offline-cache-card:has-text('Pronto Offline')", timeout=6000)
+            except Exception:
+                pass
             cache_card_txt = page.locator("#eixoverde-offline-cache-card").inner_text()
             check("1-tap Cache Offline DF updates readiness state cleanly", "Pronto Offline" in cache_card_txt, cache_card_txt)
 
@@ -1306,9 +1309,12 @@ def run_e2e() -> int:
                 st_hdr, txt_hdr = fetch_text("/_headers")
                 st_red, txt_red = fetch_text("/_redirects")
                 check(
-                    "Phase 8 Cloudflare Pages /_headers and /_redirects exist in dist/",
+                    "Phase 8 Cloudflare Pages /_headers and loop-free /_redirects exist in dist/",
                     st_hdr == 200 and "/app-ads.txt" in txt_hdr
-                    and st_red == 200 and "https://www.eixoverde.com/*" in txt_red,
+                    and st_red == 200
+                    and "/app/privacidade.html /privacidade 301" in txt_red
+                    and "/privacidade /privacidade.html" not in txt_red
+                    and "/exclusao-conta /exclusao-conta.html" not in txt_red,
                 )
                 st_man, txt_man = fetch_text("/app/manifest.webmanifest")
                 man_json = json.loads(txt_man)

@@ -1,6 +1,7 @@
-https://www.eixoverde.com/* https://eixoverde.com/:splat 301!
-/app/privacidade.html /privacidade.html 301
-/app/exclusao-conta.html /exclusao-conta.html 301
-/privacidade /privacidade.html 301
-/politica-de-privacidade /privacidade.html 301
-/exclusao-conta /exclusao-conta.html 301
+# Cloudflare Pages path redirects
+# Note: Cloudflare Pages Pretty URLs automatically serves privacidade.html at /privacidade
+# and exclusao-conta.html at /exclusao-conta (308 redirecting *.html -> clean path).
+# Never redirect /<page> back to /<page>.html here or Cloudflare Pages will loop (ERR_TOO_MANY_REDIRECTS).
+/app/privacidade.html /privacidade 301
+/app/exclusao-conta.html /exclusao-conta 301
+/politica-de-privacidade /privacidade 301

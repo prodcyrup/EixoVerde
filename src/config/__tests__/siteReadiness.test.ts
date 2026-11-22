@@ -33,8 +33,23 @@ describe('Phase 8 — eixoverde.com Domain, Website & Store Readiness', () => {
     expect(headers).toContain('X-Content-Type-Options: nosniff');
 
     const redirects = readRepoFile('public/_redirects');
-    expect(redirects).toContain('https://www.eixoverde.com/* https://eixoverde.com/:splat 301!');
-    expect(redirects).toContain('/app/privacidade.html /privacidade.html 301');
+    const redirectRules = redirects
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0 && !line.startsWith('#'));
+
+    expect(redirectRules).toContain('/app/privacidade.html /privacidade 301');
+    expect(redirectRules).toContain('/app/exclusao-conta.html /exclusao-conta 301');
+    expect(redirectRules).toContain('/politica-de-privacidade /privacidade 301');
+
+    // Guard against Cloudflare Pages Pretty URLs infinite redirect loops (/foo -> /foo.html)
+    // and unsupported absolute domain source rules
+    for (const rule of redirectRules) {
+      const [src, dst] = rule.split(/\s+/);
+      expect(src.startsWith('/')).toBe(true);
+      expect(dst).not.toBe(`${src}.html`);
+      expect(src).not.toMatch(/^https?:\/\//i);
+    }
 
     const robots = readRepoFile('public/robots.txt');
     expect(robots).toContain('Sitemap: https://eixoverde.com/sitemap.xml');
